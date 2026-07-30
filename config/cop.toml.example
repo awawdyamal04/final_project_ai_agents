@@ -1,0 +1,46 @@
+# Private per-peer configuration -- COP.
+#
+# Copy to config/police/game.toml and edit. Never committed with real values,
+# never sent over the network, never signed, and NOT an input to config_sha256.
+#
+# This file may not define any key owned by the shared constitution
+# (config/game.json). Anything the opponent must agree to or rely on belongs
+# there (PDF p. 128); the private file may never weaken a signed condition
+# (PDF p. 132). The loader rejects such shadowing outright.
+
+version = "1.10"
+
+[game]
+group_name = "PLACEHOLDER-Team"
+group_id   = "PLACEH01"          # exactly 8 characters, no spaces (E-45)
+members    = ["id-0000", "id-0001"]
+repos = { cop = "https://github.com/PLACEHOLDER/cop-repo", thief = "https://github.com/PLACEHOLDER/thief-repo" }
+
+[network]
+role         = "police"
+host         = "127.0.0.1"
+port         = 8801                          # MY FastMCP server port
+opponent_url = "http://127.0.0.1:8802/mcp"   # the only thing I know about the opponent
+turn_timeout_seconds = 180
+
+[strategy]
+# Leave empty to run the shipped heuristic brain.
+# police_class = "my_team.strategy:MyPoliceBrain"
+
+[trash_talk]
+# HOW the banter is produced. The MOVE is always pure Python.
+provider      = "template"   # template (0 tokens, default) | ollama | claude_api | claude_cli
+every_n_steps = 1
+
+[llm]
+model                 = ""
+step_deadline_seconds = 30
+
+[email]
+recipient = "rmisegal+uoh26finalgame@gmail.com"
+mode      = "send"           # "send" for any counting match; "draft" is dev-only
+
+# PATHS ONLY. These files are gitignored secrets (E-39, E-40) and their
+# contents never appear in configuration. Nothing here is a credential.
+credentials_path = "credentials.json"
+token_path       = "token.json"

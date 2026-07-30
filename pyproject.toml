@@ -1,0 +1,29 @@
+[project]
+name = "police-thief-p2p"
+version = "0.1.0"
+description = "Distributed Cops-and-Robbers over a Peer-to-Peer Network"
+requires-python = ">=3.12"
+dependencies = [
+    # Pinned to the version this code was written and verified against.
+    # The API used is exactly: FastMCP(name=...), the @mcp.tool decorator,
+    # mcp.run_async(transport="http", host=, port=, path=), Client(transport)
+    # accepting a URL or a FastMCP instance, and client.call_tool(...) ->
+    # CallToolResult with .data / .is_error, raising ToolError on failure.
+    "fastmcp==3.4.5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

@@ -1,0 +1,74 @@
+# ---------------------------------------------------------------------------
+# SECRETS — Appendix E rules 39 & 40, Appendix A (PDF pp. 122, 125, 148).
+# A secret pushed once is compromised forever, even if deleted in a later
+# commit, because it remains in git history. Rotate in the console instead.
+# ---------------------------------------------------------------------------
+credentials.json
+token.json
+*.credentials.json
+*.token.json
+.env
+.env.*
+*.pem
+*.key
+secrets/
+.secrets/
+
+# ---------------------------------------------------------------------------
+# COURSE MATERIAL — do not redistribute.
+# The specification PDF is the lecturer's copyrighted work ("all rights
+# reserved", Dr. Yoram Segal, 2026). The submission repositories are public, or
+# shared outside the course, so committing it would republish it. Everything the
+# project needs from it is extracted into docs/ with page references.
+# ---------------------------------------------------------------------------
+police_thief_p2p.pdf
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.python-version
+
+# ---------------------------------------------------------------------------
+# Tooling / test caches
+# ---------------------------------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------------------
+# Runtime output.
+# NOTE: match artefacts (declaration/config/log/result JSON) are DELIBERATELY
+# NOT ignored — Appendix F §2 (PDF p. 156) requires each match's config file to
+# be committed, and the replay verifier needs the logs. Only scratch output is
+# ignored here.
+# ---------------------------------------------------------------------------
+scratch/
+tmp/
+*.log
+logs/

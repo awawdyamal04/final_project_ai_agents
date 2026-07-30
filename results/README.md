@@ -24,12 +24,17 @@ This directory will contain:
 
 - `screenshots/live_cop.png` — Live GUI belief map, cop peer.
 - `screenshots/live_thief.png` — Live GUI belief map, thief peer.
+- `q20_transport_proof.md` — root cause, fix and end-to-end evidence for the
+  Q-20 two-process transport stall.
 
 ## Status notes
 
-- The full test suite baseline is **1465 passed, 3 skipped, 0 failed** (1468
-  collected). See the repository `README.md`.
-- A full **long real HTTP two-process match is not yet proven** — the transport
-  stall Q-20 is an open blocker (see [prd.md](../prd.md) §13 and
-  [docs/OPEN_QUESTIONS.md](../docs/OPEN_QUESTIONS.md)). No league matches, Gmail
-  reports or public-tunnel runs have occurred yet.
+- The full test suite baseline is **1467 passed, 3 skipped, 0 failed**. See the
+  repository `README.md`.
+- A **complete real HTTP two-process match is proven**: 35 turns, both processes
+  exit 0, final reveal over all 35 turns, mutual audit both directions, both
+  audit chains `Verified OK` (179 records each), independent replay
+  `VERIFIED OK` — survival on turn 35, winner thief, cop 5 / thief 10. Q-20 is
+  resolved; see [q20_transport_proof.md](q20_transport_proof.md).
+- Still outstanding: **Q-19** (`--gui` instability), and no league matches,
+  Gmail reports or public-tunnel runs have occurred yet.

@@ -401,3 +401,52 @@ pass.
 | **E-18** log privacy: no nonce before final reveal, at any depth | `test_audit_chain.py::test_a_nonce_cannot_be_logged_before_the_final_reveal`, `::test_a_nonce_nested_deep_is_still_refused`, `::test_the_final_reveal_may_carry_nonces`, `::test_pre_reveal_log_contains_no_action_or_nonce` | `AUTO` |
 | Real-turn audit log verifies and holds no nonce | `test_crypto_turn.py::test_audit_log_records_the_turn_and_verifies`, `::test_audit_log_holds_no_nonce_before_the_final_reveal`, `::test_commit_record_carries_only_the_commitment` | `AUTO` |
 | Two real processes: valid turn, tampering, audit tamper detection | `scripts` demonstrations, recorded in the Phase 3 report | `MANUAL` |
+
+---
+
+## 13. Implemented — Q-20 transport regression guards
+
+Two tests added with the Q-20 fix (D-42). Both speak **real HTTP over a real
+localhost socket**, unlike the rest of the peer suite, which uses the in-memory
+`Client(fastmcp_instance)` or a `LoopbackClient` that skips the transport
+entirely. They exist because the fault they guard against is invisible to any
+in-process test: it needs an OS pipe and a real server.
+
+| Requirement | Test | Class |
+|---|---|---|
+| The server keeps accepting fresh connections through repeated session reopens — 40 sequential sessions, a 4-way concurrent burst, then one more fresh connection (45 real HTTP sessions) | `tests/peer/test_http_stress.py::test_stateless_server_survives_repeated_real_http_reconnects` | `AUTO` |
+| **Q-20 root cause** — two real peer subprocesses play 12 turns with stdout captured through **undrained** pipes, the exact condition that froze the loop at turn 6; both must exit 0 | `tests/peer/test_stdout_backpressure.py::test_q20_undrained_stdout_pipe_does_not_freeze_two_peers` | `AUTO` |
+| The stdout flood is gone — each peer's undrained pipe stays under 16 KiB for a whole game | same test, assertion 2 | `AUTO` |
+| Quieting stdout removed nothing from the logs — operational JSONL still records handshake, commits and reveals both ways; both audit chains are non-empty | same test, assertions 3–4 | `AUTO` |
+| Play progresses past the old turn-6 wall, with no `send_unacknowledged` | same test, `_max_turn(...) >= 10` | `AUTO` |
+
+The stdout test deliberately does not drain the pipes during the run
+(`wait()` reads nothing), so a regression re-blocks a peer and the test fails on
+the exit-code assertion rather than passing quietly. It also does not attempt to
+make the *old* server fail: that failure was timing-dependent and a test built
+on it would be flaky. Both guards are one-directional — the fixed runtime must
+survive the churn.
+
+### Q-20 end-to-end proof
+
+`MANUAL`, performed and recorded. Full detail in
+[../results/q20_transport_proof.md](../results/q20_transport_proof.md).
+
+| Step | Observed |
+|---|---|
+| Two OS processes, real loopback FastMCP HTTP (`127.0.0.1:8801` ↔ `127.0.0.1:8802`), `game_id` `real-game-001` | both reached `ready` on `config_sha256` `410066bf…fd0a24d` |
+| Play to the configured limit | **35 turns completed**; both processes exited 0 |
+| Transport health | no `PeerTimeoutError`, no `send_unacknowledged`, no connection-refused channel restart (`transport_diagnostics`: primary 71 calls / 0 failures / 0 restarts; control 4 / 0 / 0) |
+| **E-36** final reveal | all 35 turns verified |
+| **E-36** mutual audit | both directions verified |
+| **E-19/E-20** audit chains | `Verified OK (179 records)` for each peer, reproducible with `verify_chain_file` |
+| **E-20** independent offline replay of both logs | **`VERIFIED OK`** — survival on turn 35, winner thief, cop 5 / thief 10 |
+
+`logs/` is gitignored, so the run's artefacts are local rather than committed.
+Where they are present, the last two rows reproduce with:
+
+```bash
+python -m police_thief.replay.viewer \
+  --cop logs/audit_police_real-game-001.jsonl \
+  --thief logs/audit_thief_real-game-001.jsonl
+```

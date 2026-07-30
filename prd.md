@@ -302,13 +302,15 @@ Results are reported only where observed; no fabricated numbers.
 1. Every mandatory Appendix E rule is COVERED with a passing test or a
    deterministic procedure ([docs/COMPLIANCE_AUDIT.md](docs/COMPLIANCE_AUDIT.md)).
 2. Two independent peer processes play a **complete** match end-to-end over real
-   FastMCP HTTP and both reach a terminal result. *(Blocked by Q-20 — see §13.)*
+   FastMCP HTTP and both reach a terminal result. *(Met — 35 turns, both
+   processes exited 0; Q-20 resolved, see §13.)*
 3. Both peers' logs pass mutual audit and an independent offline replay returns
-   `VERIFIED OK`.
+   `VERIFIED OK`. *(Met — both audit chains `Verified OK`, 179 records each;
+   replay `VERIFIED OK`.)*
 4. No live component can access or display the opponent's true position
    (verified structurally).
-5. The full test suite is green (current baseline: **1465 passed, 3 skipped,
-   0 failed; 1468 collected**).
+5. The full test suite is green (current baseline: **1467 passed, 3 skipped,
+   0 failed**).
 6. All mandatory numeric values come from configuration; no Appendix F literal
    in game logic.
 
@@ -339,8 +341,9 @@ Per Appendix C, Ch. 9 and Ch. 11:
 
 ## 13. Known open questions
 
-Full record in [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md). Four carried
-into the current phase:
+Full record in [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md). Three carried
+into the current phase; a fourth (Q-20) has been resolved and is recorded here
+because it gated success criterion 2.
 
 - **Q-12 — step-zero signing key (ESCALATE, unresolved).** Ch. 5 (PDF p. 56)
   says the step-zero declaration is signed "with a pre-supplied key" but never
@@ -354,14 +357,22 @@ into the current phase:
   `BLOCKED_MOVE_BECOMES_STAY` only so demonstrations terminate — it is not a
   ruling and must be agreed with each opponent.
 - **Q-19 — long `--gui` runs destabilise the FastMCP server (KNOWN
-  LIMITATION).** Past roughly six commit-reveal turns under `--gui`, with Tk
-  owning the main thread and asyncio in a worker, the HTTP server stops
+  LIMITATION, still open).** Past roughly six commit-reveal turns under `--gui`,
+  with Tk owning the main thread and asyncio in a worker, the HTTP server stops
   answering. Headless runs are unaffected. Not a specification failure; the
-  mandatory belief-map screenshots are still produced.
-- **Q-20 — two-process HTTP transport stall (OPEN BLOCKER).** The next-turn
-  pending buffer and a real anyio cancel-scope bug are fixed, but the
-  bidirectional HTTP game still stalls repeatably around turn 6: the opponent's
-  server stops accepting new connections while its process is alive. The
-  suspected cause is server-side session accumulation in FastMCP's
-  streamable-HTTP transport. **Not yet resolved; a full long real HTTP match is
-  therefore not yet proven.** Same underlying fault as Q-19.
+  mandatory belief-map screenshots are still produced. Previously assumed to
+  share a cause with Q-20; that link is now **unproven** and Q-19 has not been
+  retested against the Q-20 fix.
+- **Q-20 — two-process HTTP transport stall (RESOLVED).** Root cause proven:
+  **stdout PIPE backpressure**. The runtime echoed every operational event with
+  a synchronous `print` from inside the asyncio loop while launchers captured
+  stdout without draining it; once the pipe buffer filled, the `print` blocked
+  the loop, so each process stayed alive while its FastMCP server stopped
+  accepting connections. Fixed by defaulting the event-sink echo off (opt in
+  with `--verbose`) and uvicorn to `log_level="warning"`; JSONL and audit
+  logging are unchanged (D-42). **Evidence:** 35-turn two-process real-HTTP
+  match, both processes exit 0, final reveal over all 35 turns, mutual audit
+  both directions, both audit chains `Verified OK` (179 records each),
+  independent replay `VERIFIED OK` — survival on turn 35, winner thief, cop 5 /
+  thief 10. Full suite 1467 passed, 3 skipped, 0 failed. See
+  [results/q20_transport_proof.md](results/q20_transport_proof.md).

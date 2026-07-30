@@ -357,19 +357,79 @@ separate email.
 
 ## Q-20 — Two-process transport stall
 
-**Status: TURN TOLERANCE FIXED. TRANSPORT STALL STILL OPEN.**
+**Status: RESOLVED.** Root cause proven, fixed, and demonstrated by a complete
+35-turn two-process HTTP match. → see [DECISIONS.md](DECISIONS.md) D-42 and
+[../results/q20_transport_proof.md](../results/q20_transport_proof.md).
 
-**Fixed and kept.** The next-turn pending buffer (one turn of tolerance) works
-and is unchanged. A real anyio bug in the transport is also fixed: a FastMCP
-``Client`` is built on cancel scopes that must be entered and exited by the
-*same task*, and the old code opened a session in the startup task and tore it
-down from a turn task. anyio raised ``RuntimeError`` and -- the damaging part --
+Not a FastMCP fault and not a specification question — a defect of ours.
+
+### The proven cause: stdout PIPE backpressure
+
+The runtime built its operational event sink as `JsonEventSink(echo=True)`, so
+every event was also written to stdout with a synchronous
+`print(..., flush=True)`; uvicorn added one INFO line per HTTP request on the
+same stream. Both subprocess launchers captured stdout with
+`stdout=subprocess.PIPE` and did **not** drain it while the game ran.
+
+An OS pipe buffer is finite. Once it filled, the next `print` blocked — and it
+blocked *inside the asyncio event loop*, because the sink is called from the
+turn coroutines. The process therefore stayed alive and never crashed, but its
+FastMCP server could no longer accept or answer connections while the loop was
+parked in a blocking write. From the opposite peer this looks exactly like the
+symptom recorded below: a live opponent whose server has stopped listening. The
+diagnostic measured roughly 40 seconds of event-loop lag at the moment of the
+freeze.
+
+This explains every observation at once — why it was independent of client
+design, why it always landed near the same turn (the same volume of output fills
+the same buffer), and why the identical turn sequence ran to 35 turns in-process
+(no pipe involved).
+
+### The fix
+
+- `JsonEventSink` echo is now **false by default** in `peer/run.py`; the JSONL
+  operational log and the cryptographic audit chain are unchanged and still
+  written in full.
+- A new `--verbose` CLI flag re-enables live stdout echo explicitly, for
+  watching a run by hand.
+- `PeerServer` defaults uvicorn to `log_level="warning"`, removing the
+  per-request INFO flood while keeping warnings and errors.
+- `stateless_http=True` and `json_response=True` are kept as transport
+  simplifications. They were introduced while the session-accumulation
+  hypothesis was live; they are safe and reduce moving parts, but they are
+  **not** what fixed this.
+
+### Verification
+
+- Two real peer processes, real loopback HTTP FastMCP, `game_id`
+  `real-game-001`: **35 turns completed**, both processes exited 0, no
+  `PeerTimeoutError`, no `send_unacknowledged`, and no in-play
+  connection-refused channel restart (`transport_diagnostics`: primary channel
+  71 calls / 0 failures / 0 restarts, control channel 4 calls / 0 failures /
+  0 restarts).
+- Final reveal verified all 35 turns; mutual audit verified both directions;
+  both audit chains report `Verified OK (179 records)`.
+- Independent offline replay over both logs: **`VERIFIED OK`** — survival on
+  turn 35, winner thief, cop 5 / thief 10.
+- Regression tests: `tests/peer/test_http_stress.py` (repeated real HTTP
+  session reopens against a live server) and
+  `tests/peer/test_stdout_backpressure.py` (two real peer subprocesses played
+  through deliberately **undrained** stdout pipes).
+- Full suite: **1467 passed, 3 skipped, 0 failed.**
+
+### Historical debugging record (kept deliberately)
+
+The two earlier fixes below were real and are retained. The next-turn pending
+buffer (one turn of tolerance) works and is unchanged. So is the anyio fix: a
+FastMCP `Client` is built on cancel scopes that must be entered and exited by
+the *same task*, and the old code opened a session in the startup task and tore
+it down from a turn task. anyio raised `RuntimeError` and — the damaging part —
 every subsequent reopen raised too, so one blip killed a channel permanently.
 Each session now lives inside its own worker task and is never touched from
-outside it.
+outside it. Neither fix, however, was the cause of the stall.
 
-**Still open, with the evidence.** Five client topologies were measured. All
-fail, and the last three fail at the *same turn*:
+Five client topologies were measured before the cause was found. All failed,
+and the last three failed at the *same turn*:
 
 | Topology | Fails at |
 |---|---|
@@ -377,31 +437,27 @@ fail, and the last three fail at the *same turn*:
 | Shared session, unguarded | turn 3-5 |
 | Shared session + lock | turn 5-8 |
 | Two channels, shared-object sessions | turn 6 |
-| **Two channels, worker-task sessions** (current) | **turn 6, repeatably** |
+| Two channels, worker-task sessions | turn 6, repeatably |
 
-The consistency across unrelated client designs is the finding: this is not
-client concurrency. The captured error is
-``RuntimeError: Client failed to connect: All connection attempts failed`` --
-the opponent's **server** stops accepting new connections part-way through,
-while its process is still alive and still trying to play. The peer that cannot
-connect then retries, restarts its channel, and eventually reports the turn
-failed on a deadline.
+The captured error was
+`RuntimeError: Client failed to connect: All connection attempts failed`.
 
-Ruled out: turn ordering (buffer works, visible in logs); client concurrency
-(five topologies, same wall); cancellation damage to a session (reproduced in
-isolation and it recovers cleanly); the protocol, crypto and strategy layers
-(the identical turn sequence reaches 35 turns in-process).
+Hypotheses that were **ruled out** by measurement: turn ordering (the buffer
+works, visible in the logs); client concurrency (five topologies, same wall);
+cancellation damage to a session (reproduced in isolation, recovers cleanly);
+the protocol, crypto and strategy layers (the identical turn sequence reached 35
+turns in-process).
 
-Not ruled out, and where to look next: server-side session accumulation in
-FastMCP's streamable-HTTP transport. Each session opens a long-lived ``GET
-/mcp`` stream, and a peer that restarts a channel leaves the previous one
-half-open. A session table or connection limit filling would produce exactly
-this -- a server that is alive but refuses new connections. The next experiment
-is to count active sessions server-side across a game, and to test whether a
-one-way game (only one peer initiating) survives longer than a bidirectional
-one.
+The hypothesis that was **wrong**: server-side session accumulation in FastMCP's
+streamable-HTTP transport — half-open `GET /mcp` streams filling a session table
+or connection limit. It fitted the symptom and motivated the move to
+`stateless_http=True`, but the stall survived that change. The cause was on the
+*writing* side of the process, not the listening side.
 
-Same underlying fault as Q-19.
+**Effect on Q-19.** Q-19 was previously recorded as the same underlying fault.
+That link is now unproven: the mechanism identified here is not GUI-specific, so
+whether it also explains the `--gui` instability has **not** been demonstrated.
+Q-19 remains open and untested against this fix.
 
 ---
 

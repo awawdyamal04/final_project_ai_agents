@@ -838,6 +838,67 @@ be told apart from two peers playing different games.
 
 ---
 
+## D-42 — The runtime is quiet by default; `--verbose` is opt-in
+
+**Decision.** `peer/run.py` constructs its event sink with `echo=False`, and a
+new `--verbose` flag turns the stdout echo back on. `PeerServer` defaults
+uvicorn to `log_level="warning"`. The JSONL operational log and the hash-chained
+audit log are untouched and remain **the authoritative record** — nothing was
+removed from them, only from stdout. `stateless_http=True` and
+`json_response=True` are kept as transport simplifications.
+
+**Why.** This is the fix for Q-20, and the reasoning matters more than the
+one-line change. The peer wrote every operational event to stdout with a
+synchronous `print(..., flush=True)` called from inside the asyncio turn
+coroutines, and uvicorn added an INFO line per request on the same stream. Both
+launchers captured that stdout through a pipe they never drained. A pipe buffer
+is finite: once full, the next `print` blocks, and blocking there parks the
+whole event loop — so the process stayed alive while its FastMCP server stopped
+accepting and answering connections. Roughly 40 seconds of loop lag were
+measured at the freeze. Reducing the volume of synchronous output to near zero
+removes the mechanism entirely rather than widening the margin.
+
+Keeping the file logs authoritative is the point of the split. Diagnostics must
+survive being ignored; a peer whose evidence depends on somebody watching its
+console is not a peer that can be audited afterwards, and the audit — not the
+terminal — is what the specification actually requires (D-33, D-37). `--verbose`
+exists because watching a run live is genuinely useful during development; it is
+opt-in because doing it under an undrained capture is what caused the fault.
+
+**Two alternatives were rejected, both on the grounds that they treat the
+symptom.**
+
+*A dedicated thread for the FastMCP server.* This would let the server keep
+answering while the main loop is blocked, and it is the obvious "make the stall
+impossible" move. Rejected: the loop would still be blocked, so the peer would
+answer requests while unable to compute a turn, converting a visible freeze into
+a peer that is reachable and mute — harder to diagnose, not easier. It also adds
+a thread boundary to a codebase that deliberately runs one loop per process, and
+Q-19 is direct evidence that moving this server off the main thread has its own
+failure mode.
+
+*Raising `max_retries` and the timeouts.* Rejected because the blocked peer never
+recovers on its own: retrying against a process parked in a blocking write
+changes only how long the game takes to fail. It would also mean editing
+Appendix F values to paper over a local bug, which inverts the relationship
+between the specification and our code — and MINIMUM parameters may only move in
+the direction that makes the game harder (Q-8), not looser to accommodate us.
+
+**Cost.** A default run prints little. Accepted: the JSONL log holds strictly
+more than stdout ever did, and `--verbose` restores the old behaviour on demand.
+
+**Reversal condition.** None expected for the default. If a future launcher
+drains stdout continuously *and* live echo is wanted, `--verbose` already covers
+it — the default should still not change, because the next launcher may not
+drain.
+
+**Evidence.** [../results/q20_transport_proof.md](../results/q20_transport_proof.md);
+resolves [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) Q-20.
+
+*Added 2026-07-31; the proving run is dated 2026-07-30.*
+
+---
+
 ## D-17 — One test per mandatory rule, named by rule ID
 
 **Decision.** Test functions carry the rule ID, e.g.

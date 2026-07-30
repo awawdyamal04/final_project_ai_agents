@@ -93,6 +93,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "detects it (test/demo only)"
         ),
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help=(
+            "echo every operational event to stdout. Off by default: the events "
+            "are always written to the JSONL log, and echoing them floods stdout "
+            "fast enough that an undrained capture pipe blocks the event loop "
+            "(the Q-20 turn-6 freeze). Opt in only when watching a run live."
+        ),
+    )
     return parser
 
 
@@ -110,7 +120,7 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
         path=Path(args.log_dir) / f"peer_{role.value}_{args.game_id}.jsonl",
         role=role.value,
         game_id=args.game_id,
-        echo=True,
+        echo=args.verbose,
     )
 
     # Never printed: credential paths, opponent internals, private file body.

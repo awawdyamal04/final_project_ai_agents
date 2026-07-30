@@ -365,6 +365,49 @@ object has no opponent-position attribute.
 
 ---
 
+## Phase 7b — Transport stabilisation, Q-20 `[M]` ✅ COMPLETE
+*2 new tests; 1467 passed, 3 skipped, 0 failed. A real 35-turn two-process HTTP
+match now completes, audits and replays `VERIFIED OK`.*
+
+Unplanned, and the blocker that stood between a working local system and
+Phase 8. Recorded as its own phase because it is the only work whose deliverable
+is a *proof* rather than a feature.
+
+- [x] `[M]` Root cause proven: **stdout PIPE backpressure**, not FastMCP
+      session accumulation. A synchronous `print(..., flush=True)` from inside
+      the asyncio loop, plus uvicorn's per-request INFO lines, filled an
+      undrained capture pipe; the blocked write parked the event loop, so each
+      process stayed alive while its server stopped accepting connections
+      (~40 s of measured loop lag).
+- [x] `[M]` Fix: event-sink `echo=False` by default in `peer/run.py`; new
+      `--verbose` flag to opt back in; `PeerServer` uvicorn
+      `log_level="warning"`. JSONL operational logging and the hash-chained
+      audit log are unchanged and remain authoritative (D-42).
+- [x] `[M]` `stateless_http=True` / `json_response=True` retained as transport
+      simplifications — safe, but explicitly **not** the fix.
+- [x] `[M]` Regression guards over real sockets:
+      `tests/peer/test_http_stress.py` (45 real HTTP sessions across reopen
+      cycles and a concurrent burst) and
+      `tests/peer/test_stdout_backpressure.py` (two real peer subprocesses
+      played through deliberately undrained stdout pipes).
+- [x] `[M]` End-to-end proof, `game_id` `real-game-001`: 35 turns completed,
+      both processes exit 0, no `PeerTimeoutError`, no `send_unacknowledged`, no
+      connection-refused restart; final reveal over all 35 turns; mutual audit
+      both directions; both audit chains `Verified OK` (179 records each);
+      independent replay `VERIFIED OK` — survival on turn 35, winner thief,
+      cop 5 / thief 10.
+- [x] `[M]` Evidence recorded in
+      [results/q20_transport_proof.md](results/q20_transport_proof.md).
+
+**Exit criterion met:** two real OS processes play a full sub-game to its
+terminal condition over real HTTP, and an independent offline replay agrees.
+
+**Not addressed here:** Q-19 (`--gui` instability) was previously assumed to
+share this cause. That link is unproven and Q-19 has not been retested against
+the fix; it stays open.
+
+---
+
 ## Phase 8 — Public exposure and a real remote match `[M]`
 
 *Depends on Phases 2–7. Corresponds to PDF stage 5.*

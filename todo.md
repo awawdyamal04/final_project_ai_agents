@@ -25,6 +25,21 @@ Live task list. The full phased breakdown with exit criteria is in
       all 55 rules and all 32 parameters re-verified visually; three gaps found
       and fixed (transition-function agreement, binding field names, log record
       schema)
+- [x] **Q-20 — two-process HTTP transport stall: root cause proven and fixed.**
+      Cause was stdout PIPE backpressure blocking the asyncio loop, not FastMCP
+      session accumulation. Event-sink echo now off by default, `--verbose` to
+      opt in, uvicorn at `log_level="warning"`; JSONL and audit logging
+      unchanged (D-42).
+- [x] Q-20 regression tests over real sockets — `tests/peer/test_http_stress.py`
+      (repeated real HTTP session reopens) and
+      `tests/peer/test_stdout_backpressure.py` (two real peer subprocesses with
+      undrained stdout pipes)
+- [x] Q-20 end-to-end proof — 35-turn two-process real-HTTP match, both
+      processes exit 0, final reveal over all 35 turns, mutual audit both
+      directions, both audit chains `Verified OK` (179 records each),
+      independent replay `VERIFIED OK` (survival turn 35; thief; cop 5,
+      thief 10). Recorded in `results/q20_transport_proof.md`.
+- [x] Full suite re-run after the fix: 1467 passed, 3 skipped, 0 failed
 
 ## Start now — external latency, runs in parallel (D-20)
 

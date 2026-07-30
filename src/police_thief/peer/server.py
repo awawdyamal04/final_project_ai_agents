@@ -54,6 +54,11 @@ class PeerServer:
     host: str = "127.0.0.1"
     port: int = 8801
     path: str = "/mcp"
+    # Uvicorn logs one INFO line per request by default; on a shared event loop
+    # whose stdout is captured through an undrained pipe, that chatter helps fill
+    # the buffer and block the loop (the Q-20 turn-6 freeze). "warning" keeps
+    # warnings and errors while removing the per-request flood.
+    log_level: str = "warning"
 
     def __post_init__(self) -> None:
         self.mcp = FastMCP(name=self.peer_name)
@@ -162,6 +167,9 @@ class PeerServer:
             port=self.port,
             path=self.path,
             show_banner=False,
+            stateless_http=True,
+            json_response=True,
+            log_level=self.log_level,
         )
 
     def start(self) -> asyncio.Task[None]:

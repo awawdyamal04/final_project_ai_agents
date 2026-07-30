@@ -11,22 +11,25 @@ verbal hint that may well be a lie. Integrity between two mutually distrustful
 peers is guaranteed not by trust but by mathematics — commit-reveal over
 SHA-256, audited after the fact.
 
-> **Status — implemented and unit-tested:** configuration, game domain,
-> FastMCP transport, cryptography (commit-reveal + hash-chained audit), strategy
+> **Status — implemented and tested:** configuration, game domain, FastMCP
+> transport, cryptography (commit-reveal + hash-chained audit), strategy
 > (Bayesian belief + heuristics), scent/belief maps, the Live GUI, and the
-> offline replay verifier. The full suite is **1465 passed, 3 skipped, 0 failed
-> (1468 collected)**. Two independent peer processes handshake over FastMCP,
-> verify identical configuration hashes, and play **cryptographically committed
+> offline replay verifier. The full suite is **1467 passed, 3 skipped,
+> 0 failed**. Two independent peer processes handshake over FastMCP, verify
+> identical configuration hashes, and play **cryptographically committed
 > turns**: neither sees the other's action before committing, neither can change
 > it afterwards, and every event is written to a hash-chained tamper-evident log
-> that an independent verifier checks.
+> that an independent verifier checks. A **complete 35-turn match between two
+> real processes over real HTTP** is now demonstrated end to end —
+> **Q-20 is resolved** (see below).
 >
-> **Not yet proven / not done:** a **full long real HTTP match** between two
-> processes is **not yet demonstrated** — the transport stalls repeatably around
-> turn 6 (**Q-20, an open blocker**; see
-> [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md) and [prd.md](prd.md) §13).
-> Public-internet tunnelling, Gmail reporting, and league matches against other
-> groups are **future phases, not started**. See [TASKS.md](TASKS.md).
+> **Not yet proven / not done:** **Q-19** (long `--gui` runs destabilise the
+> server) remains an open known limitation, untested against the Q-20 fix.
+> Public-internet tunnelling, Gmail reporting, league matches against other
+> groups, and the submission split are **future phases, not started**. **Q-12**
+> (the step-zero signing key) still needs the lecturer, and **Q-18** still needs
+> negotiation. See [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md) and
+> [TASKS.md](TASKS.md).
 
 ---
 
@@ -337,6 +340,52 @@ python scripts/run_two_peers.py --stagger 5   # thief starts 5s late
 Operational events go to `logs/peer_<role>_<game-id>.jsonl` — telemetry only,
 not the cryptographic match log, and it structurally refuses to record secrets
 or any opponent position.
+
+**The runtime is quiet on stdout by default.** Add `--verbose` to echo every
+operational event live:
+
+```bash
+python -m police_thief.peer.run --shared config/game.json --private config/cop.toml.example --game-id demo --turns 5 --verbose
+```
+
+The JSONL logs are written either way and are the authoritative record —
+`--verbose` adds a console copy, it does not enable logging. The default is off
+because echoing every event with a synchronous `print` from inside the asyncio
+loop is what caused Q-20: a launcher that captures stdout without draining it
+fills the pipe buffer, the next `print` blocks the loop, and the peer's server
+stops answering while the process stays alive. Use `--verbose` when you are
+watching a terminal, not when a script is capturing the output (D-42).
+
+## Verified Q-20 result
+
+Q-20 — the two-process transport stall that repeatably froze the game around
+turn 6 — is **resolved**. The cause was ours, not FastMCP's: stdout PIPE
+backpressure blocking the event loop, as described above. Observed evidence from
+the proving run (`game_id` `real-game-001`, two OS processes over real loopback
+FastMCP HTTP, `127.0.0.1:8801` ↔ `127.0.0.1:8802`):
+
+| | |
+|---|---|
+| Match length | **35 turns completed** |
+| Process exit codes | **0 and 0** |
+| Transport health | no `PeerTimeoutError`, no `send_unacknowledged`, no connection-refused channel restart |
+| Final reveal | all 35 turns verified |
+| Mutual audit | both directions verified |
+| Audit chains | `Verified OK` — 179 records each |
+| Independent offline replay | **`VERIFIED OK`** |
+| Result | survival on turn 35; winner **thief**; cop 5, thief 10 |
+
+Two regression tests guard it, both over real sockets:
+`tests/peer/test_http_stress.py` (repeated real HTTP session reopens) and
+`tests/peer/test_stdout_backpressure.py` (two real peer subprocesses played
+through deliberately **undrained** stdout pipes). Full record in
+[results/q20_transport_proof.md](results/q20_transport_proof.md); the decision
+and the rejected alternatives are in [docs/DECISIONS.md](docs/DECISIONS.md)
+D-42.
+
+This proves the transport and a complete local match. It does **not** touch
+Q-19, public-internet tunnelling, Gmail reporting or league play, all of which
+remain outstanding.
 
 ## Replay verification
 

@@ -171,8 +171,10 @@ For all three, **the tabulated value is the code's default.**
 | `docs/OPEN_QUESTIONS.md` | Contradictions and ambiguities — **must reach the README** |
 | `docs/DECISIONS.md` | Decisions with reasoning and reversal conditions |
 | `docs/COMPLIANCE_AUDIT.md` | Per-requirement COVERED / MISSING / AMBIGUOUS / N-A status |
-| `TASKS.md` | Dependency-ordered phases, mandatory vs optional |
-| `PLAN.md`, `TODO.md`, `docs/prd/` | Mandatory repository contents (E-50) |
+| `TASKS.md` | Dependency-ordered phases, mandatory vs optional (detailed tracker) |
+| `prd.md`, `plan.md`, `todo.md` | Mandatory repository contents (E-50); the Vibe-Coding WHAT/HOW/checklist stages |
+| `requirements.txt` | Course-convention install (`pip install -r`); versions live in `pyproject.toml` |
+| `results/` | Observed submission artefacts: screenshots, replay reports, benchmarks, plots |
 
 ---
 

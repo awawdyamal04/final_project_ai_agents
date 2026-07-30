@@ -484,17 +484,19 @@ deterministic. The whole series can be played at zero tokens.
 ```
 police-thief-p2p/
 ├── README.md                  academic report (E-42, E-50; contents per Ch. 9)
-├── PLAN.md                    work plan (E-50)
-├── TODO.md                    task list (E-50)
-├── TASKS.md                   phased breakdown
+├── prd.md                     product requirements — the WHAT (E-50)
+├── plan.md                    work plan — the HOW (E-50)
+├── todo.md                    task checklist (E-50)
+├── TASKS.md                   phased breakdown (detailed tracker)
 ├── CLAUDE.md                  standing instructions for future sessions
+├── requirements.txt           course-convention install; versions in pyproject.toml
 ├── .gitignore                 E-39, E-40
 ├── pyproject.toml
+├── results/                   observed artefacts: screenshots, replay reports, benchmarks
 ├── docs/
 │   ├── REQUIREMENTS.md  PARAMETERS.md  ARCHITECTURE.md  PROTOCOL.md
 │   ├── ACCEPTANCE_TESTS.md  OPEN_QUESTIONS.md  DECISIONS.md
-│   ├── COMPLIANCE_AUDIT.md
-│   └── prd/                   seven PRD files, one per stage (E-50)
+│   └── COMPLIANCE_AUDIT.md
 ├── config/
 │   ├── police/game.json  police/game.toml
 │   └── thief/game.json   thief/game.toml

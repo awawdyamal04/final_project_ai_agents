@@ -1,0 +1,10 @@
+# Dependency versions are defined once, in pyproject.toml (the source of truth).
+# This file exists only to satisfy the course convention that a project install
+# via `python -m pip install -r requirements.txt`. It performs an editable
+# install of this package together with its development extras (pytest,
+# pytest-asyncio), so versions never diverge from pyproject.toml.
+#
+# Runtime dependency: fastmcp==3.4.5  (pinned in pyproject.toml)
+# Dev dependencies:    pytest>=8.0, pytest-asyncio>=0.24  (pyproject.toml [dev])
+
+-e .[dev]

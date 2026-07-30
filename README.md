@@ -11,13 +11,22 @@ verbal hint that may well be a lie. Integrity between two mutually distrustful
 peers is guaranteed not by trust but by mathematics — commit-reveal over
 SHA-256, audited after the fact.
 
-> **Status: configuration, game domain, transport and cryptography complete**
-> (1307 tests). Two independent peer processes handshake over FastMCP, verify
-> identical configuration hashes, and play **cryptographically committed
-> turns**: neither sees the other's action before committing, neither can
-> change it afterwards, and every event is written to a hash-chained
-> tamper-evident log that an independent verifier checks. Remaining: scent,
-> belief maps, strategy, GUI, replay viewer, Gmail — see [TASKS.md](TASKS.md).
+> **Status — implemented and unit-tested:** configuration, game domain,
+> FastMCP transport, cryptography (commit-reveal + hash-chained audit), strategy
+> (Bayesian belief + heuristics), scent/belief maps, the Live GUI, and the
+> offline replay verifier. The full suite is **1465 passed, 3 skipped, 0 failed
+> (1468 collected)**. Two independent peer processes handshake over FastMCP,
+> verify identical configuration hashes, and play **cryptographically committed
+> turns**: neither sees the other's action before committing, neither can change
+> it afterwards, and every event is written to a hash-chained tamper-evident log
+> that an independent verifier checks.
+>
+> **Not yet proven / not done:** a **full long real HTTP match** between two
+> processes is **not yet demonstrated** — the transport stalls repeatably around
+> turn 6 (**Q-20, an open blocker**; see
+> [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md) and [prd.md](prd.md) §13).
+> Public-internet tunnelling, Gmail reporting, and league matches against other
+> groups are **future phases, not started**. See [TASKS.md](TASKS.md).
 
 ---
 
@@ -58,7 +67,11 @@ Read in this order.
 | [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md) | Contradictions and ambiguities found in the PDF, with status and resolution |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Decisions taken, with reasoning, cost and reversal conditions |
 | [docs/COMPLIANCE_AUDIT.md](docs/COMPLIANCE_AUDIT.md) | Per-requirement COVERED / MISSING / AMBIGUOUS / NOT APPLICABLE status |
+| [prd.md](prd.md) | Product requirements — **what** the system must do: goal, problem, Dec-POMDP, scent/belief/commit-reveal methods, constraints, success criteria, deliverables, open questions |
+| [plan.md](plan.md) | Work plan — **how** it is built, in verified vertical slices |
+| [todo.md](todo.md) | Live task checklist |
 | [TASKS.md](TASKS.md) | Dependency-ordered phases; mandatory work separated from optional enhancements |
+| [results/README.md](results/README.md) | Observed artefacts: screenshots, replay reports, benchmarks, plots |
 | [CLAUDE.md](CLAUDE.md) | Standing instructions for future development sessions |
 
 ---
@@ -152,11 +165,13 @@ out of scope until every mandatory requirement is complete and verified.
 
 ## Installation
 
-Python 3.12. No third-party runtime dependency yet — `fastmcp` arrives with the
-network layer in Phase 2.
+Python 3.12. The one runtime dependency is `fastmcp` (pinned `3.4.5`); dev
+extras are `pytest` and `pytest-asyncio`. Versions are declared once in
+`pyproject.toml`; `requirements.txt` installs the same set via an editable
+install.
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev]"      # or: python -m pip install -r requirements.txt
 ```
 
 ## Verifying a configuration

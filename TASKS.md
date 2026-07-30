@@ -49,7 +49,7 @@ rationale is sound, with two deviations noted at Phase 4 and Phase 6.
 - [x] `[M]` `python -m police_thief.config.verify` CLI, non-zero exit on
       failure, no secret material printed.
 - [x] `[M]` `tests/config/` — 214 tests.
-- [x] `[P]` `PLAN.md` and `TODO.md` at repo root (E-50).
+- [x] `[P]` `plan.md` and `todo.md` at repo root (E-50).
 - [ ] `[P]` `docs/prd/` with seven PRD stubs, one per development stage (E-50).
       *Carried into Phase 1 — administrative, not blocking.*
 
@@ -329,7 +329,7 @@ viewer steps through a recorded sub-game.
 
 ## Phase 7 — Live GUI `[M]` ✅ COMPLETE (one limitation, Q-19)
 *34 new tests; 1394 total. Two-process GUI game completes with mutual audit
-`Verified OK`; screenshots in `docs/screenshots/`.*
+`Verified OK`; screenshots in `results/screenshots/`.*
 
 - [x] `[M]` `gui/view_model.py` — frozen `LiveView` with no field for the
       opponent's position, so a renderer cannot draw one.
@@ -450,7 +450,7 @@ intact. (PDF stage-7 milestone.)
       identified, what chosen, why (PDF p. 5).
 - [ ] `[M]` Screenshots: Live GUI belief map; Replay showing `Verified OK`.
 - [ ] `[M]` Cross-link the two repositories in both READMEs.
-- [ ] `[M]` `PLAN.md`, `TODO.md`, `docs/prd/*` present in both repos (E-50).
+- [ ] `[M]` `prd.md`, `plan.md`, `todo.md` present in both repos (E-50).
 - [ ] `[M]` Verify no secret anywhere in **full git history**, not just HEAD
       (E-39).
 - [ ] `[M]` Annotated tag `v1.0-submission`, pushed (E-41).

@@ -297,7 +297,7 @@ Everything below remains a specification for a later phase.
 | E-44 | Each member submits separately in Moodle | `PROCESS` | One Moodle submission per group member, confirmed by each. |
 | E-45 | Unique 8-char group code, no spaces | `AUTO` | `test_e45_group_id_format` — assert `len == 8` and `not any(c.isspace())`. |
 | E-49 | Two repos, cross-linked, 2 links Moodle, 4 links JSON | `AUTO` + `PROCESS` | `test_e49_result_json_has_four_links` — assert both teams' cop and thief URLs are present. **PROCESS:** verify each repo's README links the other. |
-| E-50 | Each repo has README, /config, PRD, PLAN, TODO | `AUTO` | `test_e50_required_repo_files_exist` — assert `README.md`, `PLAN.md`, `TODO.md`, `config/`, `docs/prd/` with ≥1 PRD each. |
+| E-50 | Each repo has README, /config, PRD, PLAN, TODO | `AUTO` | `test_e50_required_repo_files_exist` — assert `README.md`, `prd.md`, `plan.md`, `todo.md`, `config/` (lowercase names, checked on a case-sensitive filesystem). |
 | E-51 | Send reports to `[agent_reporting_address]` | `AUTO` | `test_e51_recipient_is_lecturer_address` — assert the configured recipient equals `rmisegal+uoh26finalgame@gmail.com`. |
 | E-52 | One counting match per opponent | `AUTO` | `test_e52_one_counting_match_per_opponent` — assert no two counting matches share an opponent `group_id`; assert warm-up matches are flagged and excluded. |
 | E-54 | Report total tokens consumed | `AUTO` | `test_e54_tokens_reported` — assert `tokens_used` present per sub-game and in the series total; assert it is 0 in `template` mode rather than absent. |
@@ -329,7 +329,7 @@ Every line must be *observed*, not intended.
 - [ ] **Also in the README:** the documented contradiction choices from
       [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) — where identified, what chosen,
       why (PDF p. 5)
-- [ ] `PLAN.md`, `TODO.md`, `docs/prd/*` present in both repos
+- [ ] `prd.md`, `plan.md`, `todo.md` present in both repos
 - [ ] Each match's `config_<game_id>_g<NN>.json` committed
 - [ ] ≥ 2 counting matches against **different** groups
 - [ ] End-of-match email sent by **both** sides for every counting match

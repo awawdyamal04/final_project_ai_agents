@@ -14,22 +14,27 @@ SHA-256, audited after the fact.
 > **Status — implemented and tested:** configuration, game domain, FastMCP
 > transport, cryptography (commit-reveal + hash-chained audit), strategy
 > (Bayesian belief + heuristics), scent/belief maps, the Live GUI, and the
-> offline replay verifier. The full suite is **1467 passed, 3 skipped,
-> 0 failed**. Two independent peer processes handshake over FastMCP, verify
-> identical configuration hashes, and play **cryptographically committed
+> offline replay verifier. The full suite is **1563 passed, 1 skipped,
+> 0 failed** (Windows). Two independent peer processes handshake over FastMCP,
+> verify identical configuration hashes, and play **cryptographically committed
 > turns**: neither sees the other's action before committing, neither can change
 > it afterwards, and every event is written to a hash-chained tamper-evident log
 > that an independent verifier checks. A **complete 35-turn match between two
 > real processes over real HTTP** is now demonstrated end to end —
-> **Q-20 is resolved** (see below).
+> **Q-20 is resolved** (see below) — and the same match played over `--gui` on
+> real Windows, with screenshots, a clean shutdown and no benign-cancellation
+> traceback — **Q-19 is resolved** (see
+> [results/q19_gui_proof.md](results/q19_gui_proof.md)).
 >
-> **Not yet proven / not done:** **Q-19** (long `--gui` runs destabilise the
-> server) remains an open known limitation, untested against the Q-20 fix.
-> Public-internet tunnelling, Gmail reporting, league matches against other
-> groups, and the submission split are **future phases, not started**. **Q-12**
-> (the step-zero signing key) still needs the lecturer, and **Q-18** still needs
-> negotiation. See [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md) and
-> [TASKS.md](TASKS.md).
+> **Not yet proven / not done:** public-internet tunnelling, Gmail reporting,
+> league matches against other groups, and the submission split are **future
+> phases, not started**. **Q-12** (the step-zero signing key) still needs the
+> lecturer, and **Q-18** still needs negotiation. A **confirmed compliance
+> gap** was also found while closing Q-19: `capture_claim` (E-21/E-22), the
+> PDF's own mechanism for a live mid-match stop, is documented in
+> [docs/PROTOCOL.md](docs/PROTOCOL.md) but not implemented in `src/` — see
+> [docs/COMPLIANCE_AUDIT.md](docs/COMPLIANCE_AUDIT.md) Part 9. See
+> [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md) and [TASKS.md](TASKS.md).
 
 ---
 
@@ -154,9 +159,10 @@ checked by grep.
 
 ## Technology
 
-Python 3.12 · FastMCP · asyncio · pytest · SHA-256 · JSON Lines audit logs ·
-JSON (shared signed config) + TOML (private per-peer config) · Tkinter for the
-live GUI and replay viewer · Gmail API with `gmail.send` scope only, added last.
+Python 3.12 · FastMCP · asyncio · pytest · Ruff · SHA-256 · JSON Lines audit
+logs · JSON (shared signed config) + TOML (private per-peer config) · Tkinter
+for the live GUI and replay viewer · Gmail API with `gmail.send` scope only,
+added last.
 
 Deliberately absent: Docker, databases, cloud infrastructure, web frameworks,
 paid LLM APIs, and reinforcement learning. The specification is explicit that
@@ -169,7 +175,7 @@ out of scope until every mandatory requirement is complete and verified.
 ## Installation
 
 Python 3.12. The one runtime dependency is `fastmcp` (pinned `3.4.5`); dev
-extras are `pytest` and `pytest-asyncio`. Versions are declared once in
+extras are `pytest`, `pytest-asyncio` and `ruff`. Versions are declared once in
 `pyproject.toml`; `requirements.txt` installs the same set via an editable
 install.
 
@@ -226,6 +232,19 @@ it.
 ```bash
 python -m pytest
 ```
+
+## Linting
+
+```bash
+ruff check .
+```
+
+Configuration lives in `pyproject.toml [tool.ruff]`. One rule is deliberately
+disabled: `UP042` (StrEnum migration) — `Role`, `Direction` and the other wire
+enums are `class X(str, Enum)` on purpose, because canonical JSON, config
+hashing and the protocol codec all depend on that exact `str`/`.value`
+behaviour (see `docs/DECISIONS.md`). Swapping the base class is a design
+decision, not a lint fix.
 
 ## Running a headless sub-game
 
@@ -384,8 +403,39 @@ and the rejected alternatives are in [docs/DECISIONS.md](docs/DECISIONS.md)
 D-42.
 
 This proves the transport and a complete local match. It does **not** touch
-Q-19, public-internet tunnelling, Gmail reporting or league play, all of which
+public-internet tunnelling, Gmail reporting or league play, all of which
 remain outstanding.
+
+## Verified Q-19 result
+
+Q-19 — long `--gui` runs destabilising the FastMCP server — is **resolved**.
+It was four independent GUI-lifecycle defects, not one: a view-state
+publication timing bug (`GAME COMPLETE` shown too late under `--hold`), the
+automated screenshot trigger's timing relative to the actual repaint,
+Ctrl+C/window-close not reaching the worker thread's shutdown event, and a
+benign uvicorn-internal lifespan `CancelledError` traceback exposed only once
+shutdown became orderly (D-44). Observed evidence from the proving run
+(`game_id` `q19-final-proof-35-01`, two real Tk peer processes, `--gui-delay 1`):
+
+| | |
+|---|---|
+| Match length | **35 turns completed**, turn-by-turn movement visibly paced |
+| `GAME COMPLETE` banner | displayed correctly, not `YOUR TURN` |
+| Screenshots | `results/screenshots/q19_cop_final_35.png`, `results/screenshots/q19_thief_final_35.png` |
+| Shutdown | clean; no Uvicorn/Starlette `CancelledError` traceback |
+| Final reveal | all 35 turns verified |
+| Mutual audit | both directions verified |
+| Audit chains | `Verified OK` — 179 records each |
+| Windows full suite | **1563 passed, 1 skipped, 0 failed** |
+
+Full record, including why the live peers playing 35 turns while the offline
+replay found the capture at turn 30 is expected under D-41 (not a Q-19
+defect), in [results/q19_gui_proof.md](results/q19_gui_proof.md); the decision
+is [docs/DECISIONS.md](docs/DECISIONS.md) D-44. The same investigation also
+confirmed a separate, unresolved compliance gap — `capture_claim` (E-21/E-22)
+is documented but not implemented — recorded in
+[docs/COMPLIANCE_AUDIT.md](docs/COMPLIANCE_AUDIT.md) Part 9 and not fixed in
+this pass.
 
 ## Replay verification
 

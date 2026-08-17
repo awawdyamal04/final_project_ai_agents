@@ -463,22 +463,44 @@ Q-19 remains open and untested against this fix.
 
 ## Q-19 — Long `--gui` runs destabilise the FastMCP server
 
-**Status: KNOWN LIMITATION (ours, not the specification's).** *Found in Phase 6.*
+**Status: RESOLVED.** Root cause proven, fixed, and demonstrated by a complete
+35-turn two-process `--gui` match on real Windows. → see
+[DECISIONS.md](DECISIONS.md) D-44 and
+[../results/q19_gui_proof.md](../results/q19_gui_proof.md). *Found in Phase 6.*
 
-Under `--gui`, Tk must own the main thread, so the peer's asyncio loop runs in a
-worker. Past roughly six commit-reveal turns the FastMCP HTTP server then stops
-answering and a turn fails on "opponent commitment never arrived". Headless runs
-are unaffected -- a 35-turn two-process game completes and audits cleanly.
+The original symptom (stated as ruled out at the time: redraw cost, signal
+handling) was never one single defect. Retesting `--gui` against the Q-20 fix
+(D-42), rather than assuming that fix also covered it, surfaced four separate,
+GUI-specific problems, each fixed independently and each verified on a real
+Windows run:
 
-Ruled out: redraw cost (skipping unchanged frames did not help) and signal
-handling (guarded). The remaining suspect is the uvicorn/FastMCP server's
-behaviour when its loop is not on the main thread.
+1. A view-state **publication** bug, not a rendering bug: `final_status` was
+   only ever set in `run_peer`'s `finally` block, so a finished match sitting
+   in `--hold` kept showing `YOUR TURN` instead of `GAME COMPLETE` for as long
+   as a person was actually watching. Fixed by publishing the final status
+   immediately after the last turn, before `--hold` begins.
+2. Automated PNG screenshot capture was untimed relative to the actual repaint
+   -- fixed with a pure `should_capture` trigger that fires exactly once, on
+   the Tk thread, immediately after `GAME COMPLETE` has actually been drawn.
+3. Ctrl+C and the window's close button did not reach the worker thread's own
+   shutdown event at all -- Ctrl+C raised an uncaught `KeyboardInterrupt` on
+   the Tk thread, and closing the window abandoned the asyncio worker until a
+   60-second join timeout. Fixed with a thread-safe `ViewSlot.request_stop()`.
+4. A benign `asyncio.CancelledError` traceback from uvicorn's internal,
+   unexposed lifespan task printed on every shutdown once (1)-(3) were fixed
+   and shutdown became orderly enough to expose it. Fixed with a narrow
+   logging filter matching only that exact benign shape; any other shutdown
+   error remains visible.
 
-Not a specification question and not a compliance failure -- the mandatory
-artefacts (belief-map screenshots) are produced, and league play does not need
-the GUI. Options if it needs fixing: run the GUI as a separate process reading
-the operational JSONL, or drive Tk from the asyncio loop at a very low frame
-rate. Recorded rather than hidden.
+Full root-cause detail, exact code changes, and the real Windows evidence for
+each (`game_id` `q19-final-proof-35-01`: 35 turns, `GAME COMPLETE` displayed
+correctly, PNG screenshots captured, clean shutdown with no `CancelledError`,
+Final Reveal + mutual audit + both audit chains verified, Windows full suite
+green) are in [../results/q19_gui_proof.md](../results/q19_gui_proof.md).
+
+Not a specification question and never was a compliance failure -- the
+mandatory artefacts (belief-map screenshots) were always produced even while
+this was open, and league play does not require the GUI.
 
 ---
 
@@ -498,6 +520,20 @@ The test harness applies the first, named `BLOCKED_MOVE_BECOMES_STAY`, **only so
 a demonstration terminates**. It is not a ruling. Two peers applying different
 readings would compute different boards from identical action sequences, which
 surfaces as a failed audit costing both sides the match.
+
+**Scope, stated explicitly so it is not conflated with E-47.** Q-18 is only
+about resolving *this one turn's* movement/placement collision -- what happens
+to the thief's already-chosen move when the cop's simultaneous barrier lands
+on the cell that move targets. It does not touch, and does not make
+negotiable, the separate and unconditionally mandatory E-47 rule (a thief with
+no legal relocation is captured). In a real match
+([../results/q19_gui_proof.md](../results/q19_gui_proof.md) §18-19), Q-18's
+`blocked_move_becomes_stay` resolved the thief's blocked move on two
+consecutive turns as a side effect of the thief repeatedly choosing an
+already-barred cell; the E-47 capture that followed was triggered by a
+different, independently-evaluated fact (both of the thief's remaining legal
+relocations being barred) and would have fired under any of Q-18's four
+readings once that second barrier landed.
 
 ---
 

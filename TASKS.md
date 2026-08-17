@@ -50,8 +50,10 @@ rationale is sound, with two deviations noted at Phase 4 and Phase 6.
       failure, no secret material printed.
 - [x] `[M]` `tests/config/` — 214 tests.
 - [x] `[P]` `plan.md` and `todo.md` at repo root (E-50).
-- [ ] `[P]` `docs/prd/` with seven PRD stubs, one per development stage (E-50).
-      *Carried into Phase 1 — administrative, not blocking.*
+- [x] `[P]` `docs/prd/` with seven PRD stubs, one per development stage (E-50).
+      *Added 2026-08-08 — carried unchecked through every phase until now;
+      closed in the same pass that reconciled `TASKS.md`/`todo.md` with the
+      actual code state.*
 
 **Starts now, runs in parallel with every phase** (D-20 — these have external
 latency that engineering cannot compress):
@@ -102,7 +104,8 @@ serialisation key-order independence.
 barrier is rejected; coordinate overlap triggers capture; a full sub-game
 terminates with a correct score. (PDF stage-1 milestone.)
 
-**Carried forward:** `docs/prd/` seven PRD stubs (E-50), still administrative.
+**Carried forward, closed 2026-08-08:** `docs/prd/` seven PRD stubs (E-50) —
+see Phase 0.
 
 ---
 
@@ -155,66 +158,65 @@ here is operational telemetry only, D-33), turn messages, and the
 
 ---
 
-## Phase 3 — Strategy module, "blind" `[M]`
+## Phase 3 — Strategy module, "blind" `[M]` ✅ COMPLETE
 
-*Depends on Phase 2. Corresponds to PDF stage 3. Full information; no scent, no
-language, no deception yet.*
+*Depends on Phase 2. Corresponds to PDF stage 3.*
 
-- [ ] `[M]` `strategy/base.py` — `BrainBase` with `_pick_move` / `_decide_move`,
-      wired at the mandated seam: after hint decode, before commit packing.
-- [ ] `[M]` `strategy/heuristic.py` — Manhattan-distance policy against a known
-      target (D-14).
-- [ ] `[M]` Strategy class selection via `config/game.toml → [strategy]`.
+- [x] `[M]` `strategy/base.py` — `BaseStrategy` protocol + `LocalView` (the
+      information seam: state, config, belief, opponent scent, recent cells —
+      no opponent position, no harness, no global state reachable from it).
+- [x] `[M]` `strategy/heuristics.py` — `CopStrategy` / `ThiefStrategy`,
+      Manhattan-distance scoring against a target, breaking ties on a fixed
+      action ordering so results are deterministic; every candidate comes from
+      `legal_actions`/`legal_moves`, so an illegal move is never even scored.
+- [x] `[M]` Strategy class selection via `config/game.toml → [strategy]`.
+      `strategy/heuristics.py::load_strategy()` reads
+      `private.strategy.police_class` / `thief_class`, imports and validates
+      the configured class, and fails fast (`StrategyLoadError`) at
+      orchestrator construction rather than silently falling back (D-43).
+      Unset/empty still means the shipped heuristic.
 
-**Exit:** given a known target location, the agent computes and executes the
-shortest path with no manual intervention. (PDF stage-3 milestone.)
-**Tests:** shortest-path correctness; legality of every emitted move; strategy
-module is genuinely separable (swap the brain, everything else unchanged).
+**Exit criterion met:** `strategy_for()`/`load_strategy()` compute a legal,
+deterministic move toward a target with no manual intervention, and the brain
+is genuinely swappable from private config with no orchestrator change
+(verified by `tests/strategy/` and `tests/peer/test_orchestrator.py`).
 
 ---
 
-## Phase 4 — Scent, belief and natural language `[M]` (partially COMPLETE)
-
-**Done:** scent emission/decay from config (D-39), Bayesian belief map with
-impossible-cell exclusion (D-40), `BaseStrategy` + `LocalView`, deterministic
-cop and thief heuristics, per-peer `OpponentTracker`, strategy wired in before
-sealing. 1342 tests; 20 automated games all terminate; two real processes play
-6 strategy-driven crypto turns with mutual audit `Verified OK`.
-
-**Not done, deliberately:** the natural-language hint layer (template provider)
-and the LLM modes. The `hint` field is already sealed and revealed end to end,
-so that layer plugs in without a protocol change.
-
-**Original plan below.**
-
-## Phase 4 — Scent, belief and natural language `[M]` (original)
+## Phase 4 — Scent, belief and natural language `[M]` ✅ COMPLETE
 
 *Depends on Phase 3. Corresponds to PDF stage 4 — the PDF calls this the most
 sensitive stage.*
 
-**Deviation from PDF ordering:** the PDF folds LLM integration into this stage.
-We implement the **template** verbal provider only (D-13), deferring any actual
-model. Template is the PDF's own default and costs zero tokens, so this is a
-narrowing of scope, not a reordering.
+**Deviation from PDF ordering, as planned:** the PDF folds LLM integration into
+this stage. We implement the **template** verbal provider only (D-13); actual
+LLM-backed providers (`ollama`, `claude_api`, `claude_cli`) are optional and
+tracked under "Optional enhancements" below, not blocking this phase.
 
-- [ ] `[M]` `domain/scent.py` — emission window, radial falloff, decay
-      `τ(t+1) = max(0, (1−ρ)·τ(t) + Δτ)`, applied **once per full turn** after
-      both moves.
-- [ ] `[M]` Each peer observes **only the opponent's** field.
-- [ ] `[M]` `domain/belief.py` — Bayesian belief map with a hint-reliability
-      coefficient; updated from scent and from received hints.
-- [ ] `[M]` `strategy/verbal.py` — the `template` provider: produce a hint,
-      classify an incoming hint. Zero tokens, deterministic.
-- [ ] `[M]` Hint validation: ≤ `hint_max_words`; reject numeric position
-      encodings (E-26, E-27).
-- [ ] `[M]` `intent` flag (`truth` / `lie`) carried and later sealed.
-- [ ] `[M]` Strategy switches to belief-driven target selection.
+- [x] `[M]` `domain/scent.py` — `ScentModel.from_config`, Gaussian radial
+      falloff fitted to the PDF's tabulated emission field, decay
+      `τ(t+1) = max(0, (1−ρ)·τ(t) + Δτ)` applied once per full turn (D-39).
+- [x] `[M]` Each peer observes **only the opponent's** field — two separate
+      `ScentField` objects maintained per peer, never a shared grid.
+- [x] `[M]` `domain/belief.py` — Bayesian belief map with impossible-cell
+      exclusion (D-40).
+- [x] `[M]` `strategy/verbal.py` — `TemplateHintProvider` (compose/interpret,
+      deterministic per `(game_id, role, turn)`, zero tokens) wrapped in
+      `SafeHintProvider` so a future network-backed provider can never break a
+      turn.
+- [x] `[M]` Hint validation: `validate_hint()` enforces `max_words` and rejects
+      numeric position encodings via `_NUMERIC_POSITION` (E-26, E-27).
+- [x] `[M]` `intent` flag (`truth` / `lie`) carried on `HintResult` and sealed
+      as a required field in `crypto/sealed.py`'s ten-key record.
+- [x] `[M]` `CopStrategy`/`ThiefStrategy` target the belief peak
+      (`view.belief.peak()`), corroborated by scent intensity.
 
-**Exit:** free-language reporting is translated into inference; the scent map
-updates and decays every step; the verbal layer produces a hint (true or false).
-(PDF stage-4 milestone.)
-**Tests:** all of §4 in [ACCEPTANCE_TESTS.md](docs/ACCEPTANCE_TESTS.md), plus
-E-25, E-26, E-27.
+**Exit criterion met:** free-language reporting is translated into inference;
+the scent map updates and decays every step; the verbal layer produces a hint,
+true or false, that is validated, sealed and revealed end to end.
+**Verified:** `tests/strategy/test_verbal.py`, `tests/strategy/
+test_scent_belief_strategy.py`, plus the crypto/replay suites that carry
+`hint`/`intent` through a sealed record.
 
 ---
 
@@ -248,6 +250,26 @@ E-25, E-26, E-27.
 **Deferred, correctly:** deadline/watchdog integration was already delivered in
 Phase 2. The capture claim (E-21/E-22) and the two-log game replay (E-20) are
 Phase 6.
+
+**Correction (2026-08-09):** the two-log game replay (E-20) was delivered in
+Phase 6 below. The capture claim (E-21/E-22) was **not** — it was silently
+dropped from Phase 6's actual checklist with no further deferral note, and
+`docs/COMPLIANCE_AUDIT.md` incorrectly continued to show E-21/E-22 as
+`COVERED` in the implemented sense. Confirmed still absent from `src/` as of
+this date; see `docs/COMPLIANCE_AUDIT.md` Part 9 and the item below.
+
+- [ ] `[M]` **`capture_claim` (E-21/E-22) — not yet implemented.** The thief
+      evaluates `evaluate_trapped_capture` on its own state after each action
+      (the one capture condition a live peer can evaluate for itself, per
+      that function's own docstring) and sends a sealed capture-claim
+      message when trapped; the cop may also claim and the thief must answer
+      truthfully. `_play_turns` stops issuing further turns once a claim is
+      confirmed. Tests needed before implementation: a fixture reproducing a
+      real trapped-thief board state, proving identical terminal
+      turn/reason/winner/score between the live-domain path and the replay
+      path; a test that no further turns are issued after a confirmed claim;
+      a test that a false claim or false denial is caught (E-21, E-22); a
+      test that replay's `VERIFIED OK` is unweakened when live stops early.
 
 ---
 
@@ -327,9 +349,10 @@ viewer steps through a recorded sub-game.
 
 ---
 
-## Phase 7 — Live GUI `[M]` ✅ COMPLETE (one limitation, Q-19)
-*34 new tests; 1394 total. Two-process GUI game completes with mutual audit
-`Verified OK`; screenshots in `results/screenshots/`.*
+## Phase 7 — Live GUI `[M]` ✅ COMPLETE
+*34 new tests, plus a further ~35 GUI-lifecycle regression tests added closing
+Q-19 (D-44). Two-process GUI game completes with mutual audit `Verified OK`;
+screenshots in `results/screenshots/`.*
 
 - [x] `[M]` `gui/view_model.py` — frozen `LiveView` with no field for the
       opponent's position, so a renderer cannot draw one.
@@ -340,7 +363,14 @@ viewer steps through a recorded sub-game.
 - [x] `[M]` Headless by default — `--gui` is opt-in, so tests and CLI runs are
       unchanged.
 - [x] `[M]` Screenshot capture for the submission evidence.
-- [ ] `[M]` Q-19: runs beyond ~6 turns under `--gui` destabilise the server.
+- [x] `[M]` **Q-19 resolved (D-44).** Not one defect: view-state publication
+      timing (`GAME COMPLETE` shown too late under `--hold`), the screenshot
+      trigger's relation to the actual repaint, Ctrl+C/window-close not
+      reaching the worker's shutdown event, and a benign uvicorn-internal
+      lifespan `CancelledError` traceback exposed once shutdown became
+      orderly. Verified on real Windows, `game_id` `q19-final-proof-35-01`,
+      35 turns, full suite 1563 passed / 1 skipped / 0 failed. See
+      `results/q19_gui_proof.md`.
 
 **Original plan below.**
 

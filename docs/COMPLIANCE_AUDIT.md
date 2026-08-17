@@ -464,3 +464,55 @@ has been invented**. Ask the lecturer before the first counting match.
 resolution (Q-9), scent model with numeric example (E-23), timeouts (Q-5). These
 are inherent to a judge-free protocol: both sides must compute identically, so
 both must agree first. None blocks Phase 1 coding.
+
+---
+
+## Part 9 — Post-implementation addendum: E-21/E-22 `capture_claim` gap (2026-08-09)
+
+**Scope note, restated.** Parts 1–8 above audit *documentation*, from a pass
+performed on 2026-07-28 before any application code existed — `COVERED` there
+means "documented, correctly classified, and mapped to a planned
+verification," explicitly **not** "implemented" (see the scope statement at
+the top of this file). Code now exists. This addendum records one specific
+place where the documentation-era `COVERED` status has since been checked
+against the implementation and found to not (yet) hold, discovered while
+investigating why a real 35-turn match's live peers and its offline replay
+disagreed on the game's length (an expected disagreement under D-41 — see
+[OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) Q-19 and
+[../results/q19_gui_proof.md](../results/q19_gui_proof.md) §19).
+
+**Finding.** `docs/PROTOCOL.md` §6.5 documents `capture_claim` — the cop
+declares a suspected capture, the thief is cryptographically obligated to
+answer truthfully (E-21, E-22) — as the PDF's own designed mechanism for a
+live peer to stop a match mid-play, once a locally-verifiable or claimed
+capture occurs. A full-repository search of `src/` for `capture_claim` /
+`CAPTURE_CLAIM` returns **no matches**: no `MessageType.CAPTURE_CLAIM`, no
+handler, nothing invoked from `peer/run.py::_play_turns` or
+`peer/orchestrator.py`. `TASKS.md` Phase 5 explicitly deferred it to Phase 6
+(`"The capture claim (E-21/E-22) ... [is] Phase 6"`); Phase 6's actual
+completed checklist does not include it, with no further deferral note
+recorded at the time.
+
+**Two adjacent things this is not.** (1) It is not the same as replay's
+ability to *reconstruct* a capture after the fact — `replay/verifier.py`
+correctly and independently recomputes the terminal turn from both sealed
+logs (D-41), and that machinery is real, tested, and unaffected by this
+finding. (2) It is not a Q-18 question — Q-18 (`docs/OPEN_QUESTIONS.md`)
+governs only how one turn's movement/barrier collision is resolved, not
+whether a capture condition itself is negotiable; E-47 is unconditionally
+mandatory regardless of Q-18's resolution.
+
+**Row-level correction.** In §4.3 above, E-21 and E-22 are marked `COVERED`
+under the documentation-era definition. That status is **not** invalidated as
+a documentation-quality assessment (the requirement is correctly captured,
+classified and mapped to a planned test in `AT §3`) but should **not** be read
+as "implemented" — a distinction the original scope note already drew but
+which is easy to lose sight of once code exists elsewhere in the project.
+`docs/ACCEPTANCE_TESTS.md` §3's own listing of `test_e21_...` / `test_e22_...`
+is, correctly, under that document's "remains a specification for a later
+phase" heading (not §9–§13, "Implemented") — so the acceptance-test map was
+never claiming these run today.
+
+**Action.** Tracked as an explicit next-phase implementation item in
+`todo.md` and `TASKS.md`. **Not implemented as part of this finding** — this
+addendum is a documentation correction, not a code change.

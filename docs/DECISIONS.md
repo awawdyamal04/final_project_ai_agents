@@ -899,6 +899,89 @@ resolves [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) Q-20.
 
 ---
 
+## D-43 — The `[strategy]` class override is wired and fails loudly
+
+**Decision.** `strategy/heuristics.py` gains `load_strategy(role_value,
+class_path)`. `PeerOrchestrator` now calls it with
+`private.strategy.police_class` / `thief_class` instead of calling
+`strategy_for(role)` unconditionally. An unset or empty path returns the
+shipped heuristic, unchanged. A configured path (`"module.path:ClassName"`) is
+imported, instantiated with no arguments, and checked for the `BaseStrategy`
+shape (`.choose` callable, `.name` present) before being accepted. Any failure
+along that path — bad path syntax, unimportable module, missing class, wrong
+shape — raises `StrategyLoadError` at orchestrator construction, not later.
+
+**Why.** `config/*.toml.example` has documented this key
+(`police_class = "my_team.strategy:MyPoliceBrain"`) since Phase 0, and
+`config/models.py` and `config/loader.py` already parsed it into
+`StrategySettings`, but nothing read it — a team could set the key, see no
+error, and unknowingly play the shipped default. That is the same class of
+silent-substitution risk the project refuses everywhere else: a config-hash
+mismatch refuses to play (E-11) rather than falling back to a default, and a
+malformed shared key is rejected by the closed schema rather than ignored
+(F-2). A strategy override that fails silently would be the one place that
+philosophy wasn't applied. Failing at construction, not at first `choose()`
+call, means the error surfaces at startup — before a match, not mid-turn.
+
+**Cost.** One more error type (`StrategyLoadError`) a peer's launcher must be
+prepared to see and report; in practice `run.py` already exits non-zero on any
+unhandled construction error, so no launcher change was needed.
+
+**Reversal condition.** None expected. If a future custom-brain protocol needs
+constructor arguments (config, seed, whatever), extend `load_strategy`'s
+instantiation step then — the import/validate/fail-fast shape stays.
+
+*Added 2026-08-08, during the post-evaluation cleanup pass that also
+reconciled `TASKS.md`/`todo.md` with the actual code state.*
+
+---
+
+## D-44 — Q-19 was four separate GUI-lifecycle defects, not one
+
+**Decision.** Retest `--gui` against the Q-20 fix explicitly rather than
+assume it was covered, since `docs/OPEN_QUESTIONS.md`'s own Q-20 entry
+recorded that link as unproven. Fix each defect found independently, with its
+own regression test, rather than one broad "make the GUI more robust" change.
+
+**Why.** The four defects found have unrelated causes and would not have been
+caught by a single fix: `final_status` was published too late (a *timing* bug
+in `run.py`, not a rendering bug in `gui/live.py`'s already-correct
+`banner_for`); the screenshot trigger needed to fire relative to an actual
+repaint, not a published snapshot; Ctrl+C and window-close never reached the
+worker thread's shutdown event at all; and a benign uvicorn-internal
+`CancelledError` traceback only became visible once shutdown was orderly
+enough to expose it. Treating them as one bundle risked declaring Q-19
+resolved on the strength of a fix that addressed only the first defect found.
+
+**Cost.** Four smaller, targeted changes and four smaller, targeted test
+suites (`tests/gui/test_capture.py`, `tests/gui/test_drive_main_thread.py`,
+two tests in `tests/gui/test_live_gui.py`, one in `tests/peer/test_run_cli.py`,
+`tests/peer/test_server_shutdown.py`) rather than one. Accepted: each defect
+is independently verifiable and independently regressable.
+
+**Evidence.** [../results/q19_gui_proof.md](../results/q19_gui_proof.md) --
+real Windows run `game_id` `q19-final-proof-35-01`: 35 turns, `GAME COMPLETE`
+displayed correctly, PNG screenshots captured
+(`results/screenshots/q19_cop_final_35.png`,
+`results/screenshots/q19_thief_final_35.png`), clean shutdown with no
+`CancelledError` traceback, Final Reveal over all 35 turns, mutual audit both
+directions, both audit chains `Verified OK` (179 records), Windows full suite
+1563 passed / 1 skipped / 0 failed. Resolves
+[OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) Q-19.
+
+**Separately confirmed, not fixed here.** The same investigation (verifying
+why live played 35 turns while the offline replay found a capture at turn 30
+-- itself expected under D-41, not a new defect) surfaced that `capture_claim`
+(E-21/E-22), the PDF's own designed mechanism for a live mid-match stop
+(`docs/PROTOCOL.md` §6.5), is completely unimplemented in `src/`, despite
+`docs/COMPLIANCE_AUDIT.md` marking E-21/E-22 `COVERED`. Tracked as a follow-up
+in `docs/COMPLIANCE_AUDIT.md` Part 9 and `todo.md`; not implemented as part of
+this decision.
+
+*Added 2026-08-09.*
+
+---
+
 ## D-17 — One test per mandatory rule, named by rule ID
 
 **Decision.** Test functions carry the rule ID, e.g.

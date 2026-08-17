@@ -356,13 +356,28 @@ because it gated success criterion 2.
   thief's chosen cell. Four readings exist; the harness applies
   `BLOCKED_MOVE_BECOMES_STAY` only so demonstrations terminate — it is not a
   ruling and must be agreed with each opponent.
-- **Q-19 — long `--gui` runs destabilise the FastMCP server (KNOWN
-  LIMITATION, still open).** Past roughly six commit-reveal turns under `--gui`,
-  with Tk owning the main thread and asyncio in a worker, the HTTP server stops
-  answering. Headless runs are unaffected. Not a specification failure; the
-  mandatory belief-map screenshots are still produced. Previously assumed to
-  share a cause with Q-20; that link is now **unproven** and Q-19 has not been
-  retested against the Q-20 fix.
+- **Q-19 — long `--gui` runs destabilise the FastMCP server (RESOLVED).**
+  Not one defect: retesting `--gui` against the Q-20 fix (rather than assuming
+  it was covered) surfaced four independent GUI-lifecycle problems — a
+  view-state publication timing bug (`GAME COMPLETE` shown too late under
+  `--hold`), the automated screenshot trigger's timing relative to the actual
+  repaint, Ctrl+C/window-close not reaching the worker thread's shutdown
+  event, and a benign uvicorn-internal lifespan `CancelledError` traceback
+  exposed only once shutdown became orderly. Each fixed independently, each
+  with its own regression tests (D-44). **Evidence:** real Windows run
+  `game_id` `q19-final-proof-35-01` — 35 turns, `GAME COMPLETE` displayed
+  correctly, PNG screenshots captured, clean shutdown with no traceback,
+  Final Reveal + mutual audit + both audit chains verified, full suite 1563
+  passed / 1 skipped / 0 failed. See
+  [results/q19_gui_proof.md](results/q19_gui_proof.md).
+- **`capture_claim` (E-21/E-22) — confirmed implementation gap, not yet
+  started.** Found while investigating why the Q-19 proof run's live peers
+  played 35 turns while the offline replay found the capture at turn 30 (an
+  expected divergence under D-41, not a bug — replay is the only component
+  that adjudicates). `docs/PROTOCOL.md` documents `capture_claim` as the
+  PDF's designed mechanism for a live mid-match stop; `src/` has no
+  implementation of it. See [docs/COMPLIANCE_AUDIT.md](docs/COMPLIANCE_AUDIT.md)
+  Part 9.
 - **Q-20 — two-process HTTP transport stall (RESOLVED).** Root cause proven:
   **stdout PIPE backpressure**. The runtime echoed every operational event with
   a synchronous `print` from inside the asyncio loop while launchers captured

@@ -310,11 +310,19 @@ Movement policy is described by the PDF as **the core of the grade**.
 
 | Key (`[strategy]`) | Role | How to override |
 |---|---|---|
-| `thief_class` | Your thief brain, written `package.module:Class` | Inherit from `BrainBase` and override `_pick_move` and/or `_decide_move` |
-| `police_class` | Your cop brain, likewise | In `_decide_move` the cop's barrier is also chosen |
+| `thief_class` | Your thief brain, written `package.module:Class` | Implement `police_thief.strategy.base.BaseStrategy`: a `name` attribute and `choose(view: LocalView) -> Action` |
+| `police_class` | Your cop brain, likewise | `choose` returns either a `Move` or a `PlaceBarrier` — the cop's barrier is chosen the same way a move is |
 
 Leaving the section empty runs the heuristic brain built into the reference
-implementation.
+implementation. The class named must be constructible with no arguments;
+`strategy/heuristics.py::load_strategy()` imports it, instantiates it, and
+checks it has a callable `choose` and a `name` before accepting it —
+otherwise it raises `StrategyLoadError` at startup rather than silently
+falling back to the shipped heuristic (D-43). Earlier drafts of this table
+described a `BrainBase` class with `_pick_move`/`_decide_move` methods; that
+was the original plan and was never built. What ships is the `BaseStrategy`
+protocol above — one method, `choose`, deciding both movement and (for the
+cop) barrier placement.
 
 ---
 

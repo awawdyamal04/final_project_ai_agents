@@ -450,3 +450,43 @@ python -m police_thief.replay.viewer \
   --cop logs/audit_police_real-game-001.jsonl \
   --thief logs/audit_thief_real-game-001.jsonl
 ```
+
+---
+
+## 14. Implemented — Q-19 GUI lifecycle guards
+
+Four independent defects, four independent test groups, all under `tests/gui/`
+and `tests/peer/`. Full narrative in
+[../results/q19_gui_proof.md](../results/q19_gui_proof.md); decision record
+[DECISIONS.md](DECISIONS.md) D-44.
+
+| Requirement | Test | Class |
+|---|---|---|
+| `--gui-delay`: parsed, range-checked at CLI time, ignored without `--gui` | `tests/peer/test_run_cli.py::test_gui_delay_default_is_zero`, `::test_gui_delay_accepts_valid_values`, `::test_gui_delay_rejects_invalid_values_at_parse_time`, `::test_gui_delay_seconds_helper_rejects_nan_directly`, `::test_gui_delay_seconds_helper_rejects_infinity_directly`, `::test_gui_delay_seconds_helper_rejects_negative_directly`, `::test_gui_delay_seconds_helper_accepts_the_boundary_values`, `::test_gui_delay_seconds_helper_rejects_just_over_the_maximum`, `::test_gui_delay_seconds_helper_rejects_non_numeric_text` | `AUTO` |
+| `--gui-delay` pacing never touches a protocol deadline | `tests/peer/test_run_cli.py::test_pause_runs_between_turns_and_heartbeats_both_sides`, `::test_pause_does_not_run_after_the_last_turn`, `::test_pause_disabled_without_gui`, `::test_pause_disabled_when_delay_is_zero`, `::test_pause_never_touches_anything_but_the_watchdog`, `::test_pause_never_touches_anything_when_gui_is_off` | `AUTO` |
+| `banner_for` shows `GAME COMPLETE` once `final_status` is set, unconditionally of `phase` | `tests/gui/test_live_gui.py::test_banner_for_shows_game_complete_when_final_status_is_set`, `::test_banner_for_shows_game_complete_on_failure_too`, `::test_banner_for_ignores_phase_once_final_status_is_set`, `::test_banner_for_unaffected_while_final_status_is_unset` | `AUTO` |
+| The bug was publication timing, not rendering: `gui_slot.bind_stop` happens before `--hold` | `tests/peer/test_run_cli.py::test_gui_slot_is_bound_to_the_stop_event_before_hold` | `AUTO` |
+| Live-window banner rendering, incl. the real Tk widget (`needs_tk`) | `tests/gui/test_live_gui.py::test_banner_locks_once_committed`, `::test_banner_shows_game_complete_once_final_status_is_set`, `::test_banner_shows_game_complete_even_after_a_failure`, `::test_banner_unaffected_while_final_status_is_unset` | `AUTO` / `AUTO (needs_tk)` |
+| `should_capture`: fires exactly once, only after `final_status`, never before a view exists | `tests/gui/test_capture.py::test_should_capture_false_before_final_status_is_set`, `::test_should_capture_true_the_first_time_final_status_appears`, `::test_should_capture_false_once_already_captured`, `::test_should_capture_true_on_a_failure_view_too`, `::test_should_capture_false_when_no_view_has_been_published_yet` | `AUTO` |
+| `capture_window`: real PNG via `ImageGrab`; degraded EPS fallback on failure/missing Pillow; total-failure and already-closed-window cases reported clearly | `tests/gui/test_capture.py::test_capture_window_writes_a_real_png_via_imagegrab`, `::test_capture_window_falls_back_to_degraded_eps_when_imagegrab_fails`, `::test_capture_window_reports_missing_pillow_clearly_and_falls_back`, `::test_capture_window_reports_total_failure_clearly_when_both_paths_fail`, `::test_capture_window_reports_clearly_when_the_window_is_already_gone` | `AUTO` |
+| Screenshot trigger integrated into the Tk polling loop: fires once, after `GAME COMPLETE` is drawn, never on an ordinary turn, never twice | `tests/gui/test_drive_main_thread.py::test_no_capture_without_a_screenshot_path`, `::test_no_capture_on_an_ordinary_in_progress_turn`, `::test_capture_fires_exactly_once_when_game_completes`, `::test_capture_never_refires_on_repeated_polls_of_the_same_finished_view`, `::test_capture_happens_before_the_loop_reports_finished` | `AUTO` |
+| Real Tk window captured exactly once after `GAME COMPLETE` actually renders | `tests/gui/test_live_gui.py::test_real_window_captures_exactly_once_after_game_complete_renders` | `AUTO (needs_tk)` |
+| Ctrl+C / window close reach the worker's own `stop` event via `call_soon_threadsafe`, including pre-bind and idempotency cases | `tests/gui/test_drive_main_thread.py::test_window_close_requests_worker_stop_before_quitting`, `::test_ctrl_c_during_mainloop_requests_stop_and_does_not_propagate`, `::test_request_stop_actually_wakes_a_waiting_stop_event`, `::test_request_stop_before_bind_stop_is_not_dropped`, `::test_request_stop_is_idempotent_and_safe_to_call_repeatedly`, `::test_request_stop_before_bind_and_never_bound_is_a_safe_no_op` | `AUTO` |
+| Lifespan-cancellation filter drops exactly the benign shapes (A and B) and nothing else, on a synthetic record | `tests/peer/test_server_shutdown.py::test_filter_drops_shape_a_expected_cancellation_record`, `::test_filter_keeps_shape_a_with_a_genuine_exception_type`, `::test_filter_keeps_shape_a_cancelled_error_with_an_unrelated_message`, `::test_filter_drops_shape_b_the_real_benign_lifespan_cancellation`, `::test_filter_keeps_shape_b_a_genuine_different_exception`, `::test_filter_keeps_shape_b_an_unrelated_cancelled_error`, `::test_filter_keeps_shape_b_records_from_other_loggers`, `::test_filter_keeps_empty_messages`, `::test_filter_is_installed_exactly_once_across_multiple_servers` | `AUTO` |
+| Real logger + real logging configuration: genuine shutdown errors are never swallowed | `tests/peer/test_server_shutdown.py::test_real_logger_shape_a_genuine_exception_is_not_swallowed`, `::test_real_logger_shape_b_genuine_exception_is_not_swallowed`, `::test_real_logger_unrelated_uvicorn_error_is_not_swallowed` | `AUTO` |
+
+### Q-19 end-to-end proof
+
+`MANUAL`, performed and recorded. Full detail in
+[../results/q19_gui_proof.md](../results/q19_gui_proof.md).
+
+| Step | Observed |
+|---|---|
+| Two real Tk peer processes, `--gui-delay 1`, `game_id` `q19-final-proof-35-01` | turn-by-turn movement visibly paced |
+| `GAME COMPLETE` banner | displayed correctly at match end, not `YOUR TURN` |
+| Automatic PNG screenshots | `results/screenshots/q19_cop_final_35.png`, `results/screenshots/q19_thief_final_35.png` |
+| Shutdown | clean; no Uvicorn/Starlette `CancelledError` traceback |
+| **E-36** Final Reveal | all 35 turns verified |
+| **E-36** mutual audit | both directions verified |
+| **E-19/E-20** audit chains | `Verified OK (179 records)` each side |
+| Windows full suite | 1563 passed, 1 skipped, 0 failed |

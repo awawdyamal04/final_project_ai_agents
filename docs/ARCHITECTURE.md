@@ -165,8 +165,12 @@ incoming hint + observed scent
                                             outgoing Commit
 ```
 
-Interface: `BrainBase` with `_pick_move` (and `_decide_move` for the cop, which
-also selects the barrier). Selected via `config/game.toml → [strategy]`.
+Interface: `BaseStrategy` protocol (`strategy/base.py`) — one method,
+`choose(view: LocalView) -> Action`, deciding movement and, for the cop,
+barrier placement together. Selected via `config/game.toml → [strategy]`,
+loaded by `strategy/heuristics.py::load_strategy()`, wired into
+`PeerOrchestrator.__post_init__` (D-43). This superseded an earlier planned
+`BrainBase`/`_pick_move`/`_decide_move` interface that was never built.
 
 **Default policy:** Bayesian belief map + Manhattan distance — the reference
 implementation's default and one of the three equal-standing routes. RL is out

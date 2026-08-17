@@ -24,7 +24,8 @@ When the answer arrives, signing lands behind this module's interface.
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from police_thief.config.canonical import canonical_json_bytes
 from police_thief.config.exceptions import ConfigHashMismatchError

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from police_thief.config.loader import build_shared_config
@@ -10,7 +12,6 @@ from police_thief.domain.coordinates import Coordinate
 from police_thief.domain.enums import Direction
 from police_thief.domain.exceptions import InvalidCoordinateError
 
-
 # ----------------------------------------------------------------------
 # Coordinates
 # ----------------------------------------------------------------------
@@ -18,7 +19,7 @@ from police_thief.domain.exceptions import InvalidCoordinateError
 
 def test_coordinate_is_frozen_and_hashable():
     cell = Coordinate(2, 3)
-    with pytest.raises(Exception):
+    with pytest.raises(dataclasses.FrozenInstanceError):
         cell.row = 5  # type: ignore[misc]
     assert {Coordinate(2, 3), Coordinate(2, 3)} == {Coordinate(2, 3)}
 

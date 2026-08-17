@@ -27,7 +27,6 @@ from police_thief.domain.terminal import (
 )
 from police_thief.domain.transition import apply_action
 
-
 # ----------------------------------------------------------------------
 # Terminal conditions
 # ----------------------------------------------------------------------

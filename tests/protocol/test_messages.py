@@ -48,7 +48,7 @@ def test_valid_message_round_trips():
 
 def test_envelope_key_set_is_exactly_the_schema():
     assert set(hello().to_wire()) == set(ENVELOPE_KEYS)
-    assert ENVELOPE_KEYS == {
+    assert {
         "schema_version",
         "protocol_version",
         "message_id",
@@ -59,7 +59,7 @@ def test_envelope_key_set_is_exactly_the_schema():
         "turn_number",
         "timestamp",
         "payload",
-    }
+    } == ENVELOPE_KEYS
 
 
 @pytest.mark.parametrize("field", sorted(ENVELOPE_KEYS))

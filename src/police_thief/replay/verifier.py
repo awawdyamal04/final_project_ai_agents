@@ -27,21 +27,22 @@ Verdicts
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from police_thief.audit.verifier import load_records, verify_chain
 from police_thief.config.models import SharedConfig
 from police_thief.crypto.sealed import commitment_for_mapping
-from police_thief.domain.actions import Action, Move, PlaceBarrier
+from police_thief.domain.actions import Move, PlaceBarrier
 from police_thief.domain.capture import (
     evaluate_barrier_capture,
     evaluate_full_turn_capture,
 )
 from police_thief.domain.coordinates import Coordinate
-from police_thief.domain.enums import Direction, Role, TerminalReason
+from police_thief.domain.enums import Direction, Role
 from police_thief.domain.exceptions import BlockedCellError, DomainError
 from police_thief.domain.scoring import ScoreResult, calculate_score
 from police_thief.domain.simultaneity import (
@@ -52,9 +53,11 @@ from police_thief.domain.simultaneity import (
 from police_thief.domain.state import LocalState
 from police_thief.domain.terminal import (
     TerminalResult,
-    capture as terminal_capture,
     evaluate_move_ceiling,
     evaluate_survival,
+)
+from police_thief.domain.terminal import (
+    capture as terminal_capture,
 )
 from police_thief.domain.transition import apply_action, observe_barrier
 from police_thief.protocol.action_codec import decode_action

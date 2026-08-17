@@ -15,9 +15,9 @@ enforced by the transition table rather than by a check someone could forget.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable
 
 from police_thief.protocol.exceptions import InvalidPeerStateError
 

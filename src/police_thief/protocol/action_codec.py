@@ -18,7 +18,8 @@ types and nothing else.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from police_thief.domain.actions import Action, Move, PlaceBarrier
 from police_thief.domain.coordinates import Coordinate

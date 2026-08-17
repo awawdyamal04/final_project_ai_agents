@@ -24,10 +24,11 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from police_thief.audit.chain import GENESIS_HASH, compute_record_hash
 from police_thief.audit.exceptions import AuditPrivacyError
@@ -173,4 +174,4 @@ class AuditLog:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    return datetime.now(UTC).isoformat(timespec="milliseconds")

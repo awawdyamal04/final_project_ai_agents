@@ -23,8 +23,9 @@ Building a snapshot never mutates anything. The GUI is a reader.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 FORBIDDEN_VIEW_FIELDS: frozenset[str] = frozenset(
     {

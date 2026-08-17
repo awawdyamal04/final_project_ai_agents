@@ -48,7 +48,7 @@ class BeliefMap:
         """Total ignorance: every passable cell equally likely."""
         cells = [c for c in board.all_cells() if not board.is_blocked(c)]
         weight = 1.0 / len(cells)
-        return cls(board, {c: weight for c in cells})
+        return cls(board, dict.fromkeys(cells, weight))
 
     @classmethod
     def certain(cls, board: Board, cell: Coordinate) -> BeliefMap:

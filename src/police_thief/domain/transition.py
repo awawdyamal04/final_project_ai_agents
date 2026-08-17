@@ -30,7 +30,6 @@ from dataclasses import dataclass, field, replace
 from police_thief.config.models import SharedConfig
 from police_thief.domain.actions import Action, Move, PlaceBarrier
 from police_thief.domain.coordinates import Coordinate
-from police_thief.domain.enums import Role
 from police_thief.domain.events import AgentMoved, BarrierPlaced, DomainEvent
 from police_thief.domain.exceptions import (
     GameAlreadyFinishedError,

@@ -15,10 +15,11 @@ commit-reveal protocol. Asserted by
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any
 
 from police_thief.domain.enums import Role
 from police_thief.protocol.exceptions import (
@@ -253,7 +254,7 @@ def utc_now() -> str:
     drifting local clock as one of the real-world failures the system must
     survive. Ordering comes from ``turn_number`` and the state machine.
     """
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    return datetime.now(UTC).isoformat(timespec="milliseconds")
 
 
 def new_message_id() -> str:

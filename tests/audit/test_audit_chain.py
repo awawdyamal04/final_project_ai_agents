@@ -66,7 +66,8 @@ def test_record_key_set_is_closed_and_complete(log):
 def test_each_record_chains_to_its_predecessor(log):
     populate(log)
     records = load_records(log.path)
-    for previous, current in zip(records, records[1:]):
+    # Deliberately unequal lengths: pairwise adjacent-record iteration.
+    for previous, current in zip(records, records[1:], strict=False):
         assert current["previous_event_hash"] == previous["current_event_hash"]
 
 

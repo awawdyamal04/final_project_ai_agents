@@ -6,9 +6,10 @@ record it cannot fully account for is not verifying anything.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any
 
 from police_thief.audit.exceptions import AuditRecordSchemaError
 
@@ -131,11 +132,12 @@ def validate_record_mapping(raw: Any, *, index: int = -1) -> None:
         raise AuditRecordSchemaError(f"{where}: sub_game must be an integer")
 
     turn = raw["turn_number"]
-    if turn is not None:
-        if isinstance(turn, bool) or not isinstance(turn, int) or turn < 0:
-            raise AuditRecordSchemaError(
-                f"{where}: turn_number must be a non-negative integer or null"
-            )
+    if turn is not None and (
+        isinstance(turn, bool) or not isinstance(turn, int) or turn < 0
+    ):
+        raise AuditRecordSchemaError(
+            f"{where}: turn_number must be a non-negative integer or null"
+        )
 
     if not isinstance(raw["payload"], dict):
         raise AuditRecordSchemaError(f"{where}: payload must be an object")

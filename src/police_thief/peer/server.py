@@ -27,12 +27,15 @@ validation.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Mapping
+from typing import Any
 
 from fastmcp import FastMCP
 
 from police_thief.peer.events import EventSink, NullEventSink
+from police_thief.peer.lifespan_filter import _install_lifespan_cancellation_filter
 from police_thief.protocol.codec import decode_mapping
 from police_thief.protocol.exceptions import (
     PeerProtocolError,
@@ -42,6 +45,10 @@ from police_thief.protocol.messages import Envelope, MessageType
 
 MessageHandler = Callable[[Envelope], Awaitable[Mapping[str, Any]]]
 """Signature the orchestrator provides: validated envelope in, wire reply out."""
+
+# The benign-shutdown-cancellation logging filter (Q-19, D-44) now lives in
+# police_thief.peer.lifespan_filter, self-contained and independently tested.
+# __post_init__ below installs it; see that module for the full reasoning.
 
 
 @dataclass
@@ -64,6 +71,7 @@ class PeerServer:
         self.mcp = FastMCP(name=self.peer_name)
         self._register_tools()
         self._task: asyncio.Task[None] | None = None
+        _install_lifespan_cancellation_filter()
 
     # ------------------------------------------------------------------
     # Tools
@@ -183,12 +191,15 @@ class PeerServer:
         if task is None:
             return
         task.cancel()
-        try:
+        # The server task is being torn down; a transport raising on
+        # cancellation must not block shutdown. This is *our own* await of
+        # the task we just cancelled -- it is not what produces the
+        # "Exception in 'lifespan' protocol" ERROR log some shutdowns show;
+        # that comes from a separate, uvicorn-internal task this function
+        # has no handle to and cannot await directly. See
+        # police_thief.peer.lifespan_filter's module docstring.
+        with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
-        except (asyncio.CancelledError, Exception):
-            # The server task is being torn down; a transport raising on
-            # cancellation must not block shutdown.
-            pass
 
 
 def _error_reply(code: str, detail: str, *, retryable: bool) -> dict[str, Any]:

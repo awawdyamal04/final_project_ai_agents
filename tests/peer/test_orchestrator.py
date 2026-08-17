@@ -11,7 +11,6 @@ from police_thief.peer.states import PeerState
 from police_thief.protocol.exceptions import (
     ConflictingDuplicateError,
     MissingCapabilityError,
-    PeerUnavailableError,
     WrongGameIdError,
     WrongReceiverRoleError,
     WrongSenderRoleError,
@@ -245,13 +244,13 @@ async def test_exact_duplicate_returns_the_same_acknowledgement(peer_pair):
 @pytest.mark.asyncio
 async def test_conflicting_duplicate_is_rejected(peer_pair):
     cop, thief = peer_pair
-    base = dict(
-        game_id="test-game",
-        sender_role=Role.POLICE,
-        receiver_role=Role.THIEF,
-        message_type=MessageType.CONFIG_HASH,
-        message_id="reused",
-    )
+    base = {
+        "game_id": "test-game",
+        "sender_role": Role.POLICE,
+        "receiver_role": Role.THIEF,
+        "message_type": MessageType.CONFIG_HASH,
+        "message_id": "reused",
+    }
     await thief.orchestrator.handle_message(
         new_envelope(
             **base,
@@ -312,3 +311,46 @@ async def test_id_factory_is_injectable(shared, cop_private):
     peer.orchestrator.id_factory = lambda: next(ids)
     envelope = peer.orchestrator._envelope(MessageType.READY)
     assert envelope.message_id == "id-0"
+
+
+# ----------------------------------------------------------------------
+# Configured strategy override -- [strategy] police_class / thief_class
+# ----------------------------------------------------------------------
+
+
+def test_orchestrator_uses_the_shipped_default_when_unconfigured(shared, cop_private):
+    from police_thief.strategy.heuristics import CopStrategy
+
+    assert cop_private.strategy.police_class is None
+    peer = build_peer(shared, cop_private)
+    assert isinstance(peer.orchestrator.strategy, CopStrategy)
+
+
+def test_orchestrator_loads_a_configured_brain(shared, cop_private):
+    import dataclasses
+
+    from police_thief.config.models import StrategySettings
+    from tests.strategy._dummy_brain import DummyBrain
+
+    configured = dataclasses.replace(
+        cop_private,
+        strategy=StrategySettings(
+            police_class="tests.strategy._dummy_brain:DummyBrain"
+        ),
+    )
+    peer = build_peer(shared, configured)
+    assert isinstance(peer.orchestrator.strategy, DummyBrain)
+
+
+def test_orchestrator_construction_fails_fast_on_a_bad_override(shared, cop_private):
+    import dataclasses
+
+    from police_thief.config.models import StrategySettings
+    from police_thief.strategy.heuristics import StrategyLoadError
+
+    configured = dataclasses.replace(
+        cop_private,
+        strategy=StrategySettings(police_class="no.such.module:Whatever"),
+    )
+    with pytest.raises(StrategyLoadError):
+        build_peer(shared, configured)

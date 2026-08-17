@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from police_thief.domain.capture import (
     evaluate_barrier_capture,
     evaluate_full_turn_capture,

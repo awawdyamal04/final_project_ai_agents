@@ -16,8 +16,8 @@ concept; inventing one would be inventing a requirement.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field, replace
-from typing import Iterable, Iterator
 
 from police_thief.config.models import SharedConfig
 from police_thief.domain.coordinates import Coordinate

@@ -243,13 +243,13 @@ async def test_duplicate_commit_message_is_idempotent(peer_pair):
 
 async def test_conflicting_commit_is_rejected(peer_pair):
     cop, _ = await ready_pair(peer_pair)
-    base = dict(
-        game_id="test-game",
-        sender_role=Role.THIEF,
-        receiver_role=Role.POLICE,
-        message_type=MessageType.COMMIT,
-        turn_number=1,
-    )
+    base = {
+        "game_id": "test-game",
+        "sender_role": Role.THIEF,
+        "receiver_role": Role.POLICE,
+        "message_type": MessageType.COMMIT,
+        "turn_number": 1,
+    }
     await cop.orchestrator.handle_message(
         new_envelope(
             **base,

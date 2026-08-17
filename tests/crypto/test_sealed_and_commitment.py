@@ -13,7 +13,6 @@ from police_thief.crypto.nonce import (
 )
 from police_thief.crypto.sealed import (
     SEALED_KEYS,
-    SEALED_SCHEMA_VERSION,
     SealedRecord,
     commitment_for_mapping,
     sealed_record_from_mapping,
@@ -28,17 +27,17 @@ FIXED_NONCE = "0" * 32
 
 
 def record(**overrides) -> SealedRecord:
-    base = dict(
-        game_id="g1",
-        sub_game=1,
-        turn=3,
-        role=Role.POLICE,
-        state="a" * 64,
-        action=Move(Direction.N),
-        hint="heading for the bright lights",
-        intent="truth",
-        nonce=FIXED_NONCE,
-    )
+    base = {
+        "game_id": "g1",
+        "sub_game": 1,
+        "turn": 3,
+        "role": Role.POLICE,
+        "state": "a" * 64,
+        "action": Move(Direction.N),
+        "hint": "heading for the bright lights",
+        "intent": "truth",
+        "nonce": FIXED_NONCE,
+    }
     base.update(overrides)
     return SealedRecord(**base)
 
@@ -52,7 +51,8 @@ def test_nonce_uses_secrets_not_random():
     """random's Mersenne Twister state is recoverable from its output."""
     import police_thief.crypto.nonce as module
 
-    source = open(module.__file__, encoding="utf-8").read()
+    with open(module.__file__, encoding="utf-8") as f:
+        source = f.read()
     assert "import secrets" in source
     assert "import random" not in source
     assert "secrets.token_hex" in source
@@ -101,10 +101,10 @@ def test_guard_remembers_an_abandoned_nonce():
 
 def test_sealed_key_set_is_closed_and_complete():
     assert set(record().to_sealed_mapping()) == set(SEALED_KEYS)
-    assert SEALED_KEYS == {
+    assert {
         "v", "game_id", "sub_game", "turn", "role",
         "state", "action", "hint", "intent", "nonce",
-    }
+    } == SEALED_KEYS
 
 
 def test_sealed_record_carries_no_timestamp():
@@ -287,7 +287,8 @@ def test_commitment_binds_game_turn_role_and_action():
 def test_commitment_uses_the_single_canonical_helper():
     import police_thief.crypto.sealed as module
 
-    source = open(module.__file__, encoding="utf-8").read()
+    with open(module.__file__, encoding="utf-8") as f:
+        source = f.read()
     assert "canonical_json_bytes" in source
     assert "sort_keys" not in source  # not reimplemented
     assert "hashlib" not in source    # goes through config.hashing

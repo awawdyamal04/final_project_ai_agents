@@ -12,11 +12,11 @@ independent objects that could each have been produced on a different machine.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 from police_thief.config.models import SharedConfig
-from police_thief.domain.actions import Action, Move, PlaceBarrier
+from police_thief.domain.actions import Action, Move
 from police_thief.domain.capture import (
     evaluate_barrier_capture,
     evaluate_full_turn_capture,
@@ -34,9 +34,11 @@ from police_thief.domain.simultaneity import (
 from police_thief.domain.state import LocalState
 from police_thief.domain.terminal import (
     TerminalResult,
-    capture as terminal_capture,
     evaluate_move_ceiling,
     evaluate_survival,
+)
+from police_thief.domain.terminal import (
+    capture as terminal_capture,
 )
 from police_thief.domain.transition import apply_action, observe_barrier
 

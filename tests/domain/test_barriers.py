@@ -21,7 +21,6 @@ from police_thief.domain.rules import (
 from police_thief.domain.transition import apply_action, observe_barrier
 from tests.domain.conftest import place_at, wall_in
 
-
 # ----------------------------------------------------------------------
 # Authorisation
 # ----------------------------------------------------------------------

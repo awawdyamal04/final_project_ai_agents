@@ -18,16 +18,14 @@ failure voids the whole match (E-19).
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from police_thief.audit.chain import GENESIS_HASH, compute_record_hash
 from police_thief.audit.exceptions import (
-    AuditChainBreakError,
-    AuditHashMismatchError,
     AuditRecordSchemaError,
-    DuplicateAuditEventError,
 )
 from police_thief.audit.records import validate_record_mapping
 

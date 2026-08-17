@@ -32,13 +32,13 @@ def thief() -> CommitRevealCoordinator:
 
 
 def seal(coord: CommitRevealCoordinator, turn: int = 1, **overrides) -> str:
-    base = dict(
-        turn=turn,
-        action=Move(Direction.N),
-        hint="a hint",
-        intent="truth",
-        state_hash=STATE_HASH,
-    )
+    base = {
+        "turn": turn,
+        "action": Move(Direction.N),
+        "hint": "a hint",
+        "intent": "truth",
+        "state_hash": STATE_HASH,
+    }
     base.update(overrides)
     return coord.seal(**base)
 
@@ -366,17 +366,17 @@ def test_a_nonce_is_never_reused_across_turns():
 def _opponent_sealed(turn: int, **overrides):
     from police_thief.crypto.sealed import SealedRecord
 
-    base = dict(
-        game_id="g1",
-        sub_game=1,
-        turn=turn,
-        role=Role.THIEF,
-        state="b" * 64,
-        action=Move(Direction.S),
-        hint="their hint",
-        intent="lie",
-        nonce="9" * 32,
-    )
+    base = {
+        "game_id": "g1",
+        "sub_game": 1,
+        "turn": turn,
+        "role": Role.THIEF,
+        "state": "b" * 64,
+        "action": Move(Direction.S),
+        "hint": "their hint",
+        "intent": "lie",
+        "nonce": "9" * 32,
+    }
     plain = {k: v for k, v in overrides.items() if k in ("game_id", "sub_game")}
     base.update({k: v for k, v in overrides.items() if k not in plain})
     if "role" in overrides and isinstance(overrides["role"], str):

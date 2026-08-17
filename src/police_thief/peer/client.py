@@ -15,12 +15,10 @@ produces the same rejection and spends rate budget for nothing.
 
 from __future__ import annotations
 
-import asyncio
+import contextlib
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
-
-from fastmcp import Client
-from fastmcp.exceptions import ToolError
+from typing import Any
 
 from police_thief.peer.channel import TransportChannel
 from police_thief.peer.clock import Clock, SystemClock
@@ -31,7 +29,6 @@ from police_thief.protocol.codec import decode_mapping
 from police_thief.protocol.exceptions import (
     InvalidResponseError,
     PeerProtocolError,
-    PeerUnavailableError,
     ProtocolError,
 )
 from police_thief.protocol.messages import Envelope, MessageType
@@ -124,10 +121,8 @@ class PeerClient:
     async def aclose(self) -> None:
         """Close both sessions. Neither failure prevents the other."""
         for channel in (self._primary, self._control):
-            try:
+            with contextlib.suppress(Exception):
                 await channel.aclose()
-            except Exception:
-                pass
 
     def diagnostics(self) -> dict[str, Any]:
         """Per-channel counters. Carries no message content."""

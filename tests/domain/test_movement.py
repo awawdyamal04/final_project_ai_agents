@@ -6,7 +6,7 @@ import pytest
 
 from police_thief.domain.actions import Move
 from police_thief.domain.coordinates import Coordinate
-from police_thief.domain.enums import Direction, Role
+from police_thief.domain.enums import Direction
 from police_thief.domain.exceptions import (
     BlockedCellError,
     IllegalMoveError,
@@ -20,7 +20,6 @@ from police_thief.domain.rules import (
     legal_relocations,
     validate_move,
 )
-from police_thief.domain.state import LocalState
 from tests.domain.conftest import place_at, wall_in
 
 

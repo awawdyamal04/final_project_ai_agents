@@ -13,9 +13,8 @@ from __future__ import annotations
 
 from police_thief.config.models import SharedConfig
 from police_thief.domain.actions import Action, Move, PlaceBarrier
-from police_thief.domain.board import Board
 from police_thief.domain.coordinates import Coordinate
-from police_thief.domain.enums import ORTHOGONAL_DIRECTIONS, Direction, Role
+from police_thief.domain.enums import ORTHOGONAL_DIRECTIONS, Direction
 from police_thief.domain.exceptions import (
     BarrierQuotaExceededError,
     BlockedCellError,
@@ -25,7 +24,6 @@ from police_thief.domain.exceptions import (
     UnauthorizedBarrierActionError,
 )
 from police_thief.domain.state import LocalState
-
 
 # ----------------------------------------------------------------------
 # Movement

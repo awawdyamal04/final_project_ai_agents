@@ -12,7 +12,7 @@ the same evidence agree.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol
 
 from police_thief.config.models import SharedConfig

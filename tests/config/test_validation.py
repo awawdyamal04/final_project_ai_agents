@@ -109,8 +109,9 @@ def test_fixed_parameter_rejects_a_different_value(valid_shared, policy):
 
 def test_fixed_move_set_rejects_a_reordering():
     """A FIXED list is fixed in order too -- N,S,E,W,STAY is the agreed set."""
-    from tests.conftest import SHARED_CONFIG_PATH
     import json
+
+    from tests.conftest import SHARED_CONFIG_PATH
 
     mapping = json.loads(SHARED_CONFIG_PATH.read_text(encoding="utf-8"))
     mapping["movement_and_barriers"]["move_set"] = ["STAY", "N", "S", "E", "W"]

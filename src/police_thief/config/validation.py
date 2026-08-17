@@ -18,7 +18,8 @@ later reader can tell what was quoted from what was inferred.
 from __future__ import annotations
 
 import math
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from police_thief.config.exceptions import (
     FixedParameterViolationError,
@@ -165,7 +166,7 @@ def _values_equal(actual: Any, binding: Any) -> bool:
     if isinstance(binding, list):
         if not isinstance(actual, list) or len(actual) != len(binding):
             return False
-        return all(_values_equal(a, b) for a, b in zip(actual, binding))
+        return all(_values_equal(a, b) for a, b in zip(actual, binding, strict=True))
     if isinstance(binding, float) or isinstance(actual, float):
         if isinstance(actual, bool) or not isinstance(actual, (int, float)):
             return False

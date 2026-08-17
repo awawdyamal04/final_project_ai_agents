@@ -27,7 +27,8 @@ peers is the whole basis of mutual audit (Ch. 5, PDF p. 50).
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from police_thief.config.canonical import canonical_json_bytes
 from police_thief.config.hashing import sha256_hex

@@ -253,7 +253,7 @@ async def test_a_buffered_reveal_cannot_bypass_commit_ordering(peer_pair):
     # Draining it with no prior commit fails, exactly as an on-time reveal with
     # no commit would: buffering delays a message, it never lets one overtake.
     await advance_to(thief, 3)
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 -- any rejection is correct; see comment above
         await thief.orchestrator._drain_pending(3)
 
 
@@ -274,7 +274,7 @@ async def test_a_failed_turn_clears_the_buffer(peer_pair):
     await thief.orchestrator.handle_message(commit_envelope(3, mid="held"))
 
     # A failed turn raises by design; what matters is the buffer it leaves.
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 -- exception type is not the point here
         thief.orchestrator._fail_turn(2, "simulated timeout")
 
     assert len(thief.orchestrator.pending) == 0

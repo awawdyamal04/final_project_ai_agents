@@ -9,7 +9,9 @@ action.
 from police_thief.strategy.base import BaseStrategy, LocalView
 from police_thief.strategy.heuristics import (
     CopStrategy,
+    StrategyLoadError,
     ThiefStrategy,
+    load_strategy,
     strategy_for,
 )
 from police_thief.strategy.tracker import OpponentTracker
@@ -19,6 +21,8 @@ __all__ = [
     "CopStrategy",
     "LocalView",
     "OpponentTracker",
+    "StrategyLoadError",
     "ThiefStrategy",
+    "load_strategy",
     "strategy_for",
 ]

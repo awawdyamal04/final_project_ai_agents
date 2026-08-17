@@ -10,12 +10,15 @@ Two display mechanisms, both described in the specification:
   opponent is in that cell, overlaid with the sensed scent trail;
 * a **turn banner** -- green when it is our turn to act, grey once our commit is
   sent and the interface is locked. It is the visual form of the state machine,
-  and it is what stops a person acting out of turn.
+  and it is what stops a person acting out of turn. The banner's text/colour
+  logic itself lives in :mod:`police_thief.gui.banner`, Tk-free.
 
 Threading: Tk owns its own thread. Pumping Tk from the asyncio loop was tried
 first and is wrong -- ``update()`` blocks long enough to stall a commit
 exchange past its deadline, which fails the turn. Rendering must never be able
-to cost a match.
+to cost a match. The main-thread driving loop and the cross-thread mailbox
+live in :mod:`police_thief.gui.main_loop` and :mod:`police_thief.gui.view_slot`
+respectively (Q-19, D-44) -- this module is the window itself.
 
 Handing state across the boundary is safe without locks because
 :class:`LiveView` is frozen: the protocol thread builds a snapshot and swaps a
@@ -29,11 +32,15 @@ none of this is constructed and the peer runs exactly as before.
 from __future__ import annotations
 
 import asyncio
-import threading
-import time
-from typing import Any, Callable
+import contextlib
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from police_thief.gui.view_model import LiveView, snapshot
+from police_thief.gui.banner import GREY, banner_for
+from police_thief.gui.view_model import LiveView
+
+if TYPE_CHECKING:
+    from police_thief.gui.view_slot import ViewSlot
 
 CELL = 46
 PADDING = 14
@@ -46,8 +53,6 @@ MUTED = "#8b93a7"
 OWN = "#4da3ff"
 BARRIER = "#5a6070"
 PEAK = "#ffd166"
-GREEN = "#2ecc71"
-GREY = "#555b6b"
 RED = "#ff6b6b"
 
 
@@ -196,12 +201,8 @@ class PeerWindow:
         )
 
     def _draw_panel(self, view: LiveView) -> None:
-        acting = view.phase in ("choosing action", "idle", "turn complete")
-        locked = not acting and view.peer_state != "ready"
-        self.banner.configure(
-            text="LOCKED" if locked else "YOUR TURN",
-            bg=GREY if locked else GREEN,
-        )
+        text, bg = banner_for(view)
+        self.banner.configure(text=text, bg=bg)
 
         remaining = (
             f"{view.barriers_remaining}" if view.role == "police" else "n/a"
@@ -253,40 +254,12 @@ class PeerWindow:
     def close(self) -> None:
         if not self.closed:
             self.closed = True
-        try:
+        with contextlib.suppress(Exception):
             self.root.destroy()
-        except Exception:
-            pass
-
-
-class ViewSlot:
-    """A one-slot mailbox between the protocol thread and the GUI.
-
-    Lock-free by construction: :class:`LiveView` is frozen, so publishing is a
-    single reference swap and the reader gets whichever complete view it finds.
-    There is no shared mutable structure to tear.
-    """
-
-    def __init__(self) -> None:
-        self._latest: LiveView | None = None
-        self.finished = False
-
-    def publish(self, view: LiveView) -> None:
-        self._latest = view
-
-    def take(self) -> LiveView | None:
-        return self._latest
-
-    def stop(self, timeout: float = 0.0) -> None:
-        self.finished = True
-
-    @property
-    def alive(self) -> bool:
-        return not self.finished
 
 
 async def run_gui(
-    gui: "ViewSlot",
+    gui: ViewSlot,
     source: Callable[[], LiveView],
     stop: asyncio.Event,
     *,
@@ -301,44 +274,9 @@ async def run_gui(
     """
     try:
         while not stop.is_set():
-            try:
+            # A failed snapshot must not take the peer down.
+            with contextlib.suppress(Exception):
                 gui.publish(source())
-            except Exception:
-                pass  # a failed snapshot must not take the peer down
             await asyncio.sleep(interval)
     finally:
         gui.stop()
-
-
-def drive_on_main_thread(
-    window: PeerWindow, slot: ViewSlot, *, interval_ms: int = 120
-) -> None:
-    """Run Tk's own loop on the main thread, drawing whatever is published.
-
-    Tk must own the main thread. Driving it from a worker crashes the
-    interpreter on Windows, and pumping it from the asyncio loop stalls a
-    commit exchange past its deadline and fails the turn -- both were tried
-    before settling here. The peer's asyncio loop therefore runs in a worker
-    and hands frozen snapshots across through ``slot``.
-    """
-
-    def tick() -> None:
-        if window.closed:
-            window.root.quit()
-            return
-        view = slot.take()
-        if view is not None:
-            try:
-                window.render(view)
-            except Exception:
-                pass  # a rendering fault must never stop the peer
-        if slot.finished:
-            window.root.quit()
-            return
-        window.root.after(interval_ms, tick)
-
-    window.root.after(interval_ms, tick)
-    try:
-        window.root.mainloop()
-    except Exception:
-        pass

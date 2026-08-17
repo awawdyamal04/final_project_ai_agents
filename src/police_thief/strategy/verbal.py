@@ -206,7 +206,7 @@ def _seed(request: HintRequest) -> int:
     through the template list in order, which would make the phrasing itself a
     tell. Deterministic: a replay reproduces every hint exactly.
     """
-    material = f"{request.game_id}|{request.role}|{request.turn}".encode("utf-8")
+    material = f"{request.game_id}|{request.role}|{request.turn}".encode()
     return int.from_bytes(hashlib.sha256(material).digest()[:4], "big")
 
 

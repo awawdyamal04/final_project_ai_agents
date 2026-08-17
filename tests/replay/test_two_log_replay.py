@@ -11,14 +11,11 @@ from pathlib import Path
 import pytest
 
 from police_thief.audit.writer import AuditLog
-from police_thief.config.loader import build_shared_config, load_shared_config
-from police_thief.domain.actions import Move
-from police_thief.domain.enums import Direction
+from police_thief.config.loader import load_shared_config
 from police_thief.replay.verifier import Verdict, replay_files, replay_logs
 from police_thief.replay.viewer import render
 from tests.conftest import SHARED_CONFIG_PATH
 from tests.peer.conftest import build_peer
-from tests.peer.test_crypto_turn import play_together
 from tests.peer.test_orchestrator import drive_to_ready
 
 
@@ -65,8 +62,8 @@ async def _play(shared, cop_private, thief_private, tmp_path, turns, *, finish):
             peer.orchestrator.close_sub_game()
 
     return (
-        [json.loads(l) for l in (tmp_path / "cop.jsonl").read_text().splitlines()],
-        [json.loads(l) for l in (tmp_path / "thief.jsonl").read_text().splitlines()],
+        [json.loads(line) for line in (tmp_path / "cop.jsonl").read_text().splitlines()],
+        [json.loads(line) for line in (tmp_path / "thief.jsonl").read_text().splitlines()],
     )
 
 
@@ -191,7 +188,7 @@ async def test_mismatched_config_hash_is_detected(real_logs, cfg, tmp_path):
     payload = copy.deepcopy(start["payload"])
     payload["config_sha256"] = "f" * 64
     log.append(AuditEventType.SUB_GAME_START, payload)
-    rebuilt = [json.loads(l) for l in log.path.read_text().splitlines()]
+    rebuilt = [json.loads(line) for line in log.path.read_text().splitlines()]
 
     verdict = replay(rebuilt, thief, cfg)
     assert verdict.verdict in (Verdict.TAMPERED, Verdict.INCOMPLETE)
@@ -209,7 +206,7 @@ async def test_mismatched_policy_gives_its_own_verdict(real_logs, cfg, tmp_path)
     payload = copy.deepcopy(start["payload"])
     payload["policy"]["capture"] = "swap_counts_as_capture"
     log.append(AuditEventType.SUB_GAME_START, payload)
-    rebuilt = [json.loads(l) for l in log.path.read_text().splitlines()]
+    rebuilt = [json.loads(line) for line in log.path.read_text().splitlines()]
 
     verdict = replay(rebuilt, thief, cfg)
     assert verdict.verdict is Verdict.POLICY_MISMATCH
@@ -256,7 +253,7 @@ async def test_incorrect_claimed_score_is_contradicted(real_logs, cfg, tmp_path)
             payload,
             turn_number=record["turn_number"],
         )
-    rebuilt = [json.loads(l) for l in log.path.read_text().splitlines()]
+    rebuilt = [json.loads(line) for line in log.path.read_text().splitlines()]
 
     verdict = replay(rebuilt, thief, cfg)
     assert verdict.verdict is Verdict.TAMPERED

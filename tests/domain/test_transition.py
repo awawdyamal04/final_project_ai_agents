@@ -13,7 +13,7 @@ from police_thief.domain.exceptions import (
     OutOfBoundsMoveError,
 )
 from police_thief.domain.transition import apply_action
-from tests.domain.conftest import place_at, wall_in
+from tests.domain.conftest import wall_in
 
 
 def test_same_input_produces_the_same_output(thief_state, shared_config):

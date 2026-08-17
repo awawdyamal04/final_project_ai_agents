@@ -26,8 +26,9 @@ receives one for the other. Asserted by
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field  # noqa: F401
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from police_thief.audit.records import AuditEventType
 from police_thief.audit.writer import AuditLog
@@ -49,12 +50,8 @@ from police_thief.domain.simultaneity import (
 )
 from police_thief.domain.state import LocalState
 from police_thief.domain.transition import apply_action, observe_barrier
-from police_thief.protocol.action_codec import decode_action, encode_action
-from police_thief.strategy.heuristics import strategy_for
-from police_thief.strategy.verbal import HintRequest, default_provider
-from police_thief.strategy.tracker import OpponentTracker
-from police_thief.peer.clock import Clock, SystemClock
 from police_thief.peer.client import PeerClient
+from police_thief.peer.clock import Clock, SystemClock
 from police_thief.peer.deadline import RetryPolicy, Watchdog
 from police_thief.peer.events import EventSink, NullEventSink
 from police_thief.peer.gatekeeper import Gatekeeper, GatekeeperLimits
@@ -65,11 +62,11 @@ from police_thief.peer.pending import (
 )
 from police_thief.peer.registry import MessageRegistry
 from police_thief.peer.states import PeerState, PeerStateMachine
+from police_thief.protocol.action_codec import decode_action, encode_action
 from police_thief.protocol.exceptions import (
     ConflictingDuplicateError,
     InvalidPeerStateError,
     MissingCapabilityError,
-    PeerProtocolError,
     WrongGameIdError,
     WrongReceiverRoleError,
     WrongSenderRoleError,
@@ -82,10 +79,12 @@ from police_thief.protocol.messages import (
 )
 from police_thief.protocol.versions import (
     MANDATORY_CAPABILITIES,
-    PROTOCOL_VERSION,
     SOFTWARE_VERSION,
     SUPPORTED_CAPABILITIES,
 )
+from police_thief.strategy.heuristics import load_strategy
+from police_thief.strategy.tracker import OpponentTracker
+from police_thief.strategy.verbal import HintRequest, default_provider
 
 
 @dataclass
@@ -156,7 +155,12 @@ class PeerOrchestrator:
         self.tracker = OpponentTracker(
             role=self.role, config=self.shared, board=self.state.board
         )
-        self.strategy = strategy_for(self.role.value)
+        configured_class = (
+            self.private.strategy.police_class
+            if self.role is Role.POLICE
+            else self.private.strategy.thief_class
+        )
+        self.strategy = load_strategy(self.role.value, configured_class)
         self.hints = default_provider()
         self.latest_opponent_hint: str = ""
         self.latest_opponent_intent: str = ""
@@ -725,7 +729,7 @@ class PeerOrchestrator:
         self.events.emit("turn_complete", turn=turn)
         return opponent_action
 
-    async def _settle(self, task: "asyncio.Task[Any]") -> Any:
+    async def _settle(self, task: asyncio.Task[Any]) -> Any:
         """Collect an in-flight send without letting its failure mask progress.
 
         If our message reached the opponent but its acknowledgement did not come

@@ -20,9 +20,10 @@ configuration whose hash no longer describes it.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from police_thief.domain.enums import (
     AxisOriginCorner,

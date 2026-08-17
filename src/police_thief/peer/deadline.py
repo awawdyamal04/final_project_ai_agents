@@ -18,8 +18,10 @@ and spends the rate budget the Gatekeeper exists to protect.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Awaitable, Callable, TypeVar
+from typing import TypeVar
 
 from police_thief.config.models import SharedConfig
 from police_thief.peer.clock import Clock, SystemClock
@@ -27,7 +29,6 @@ from police_thief.protocol.exceptions import (
     PeerProtocolError,
     PeerTimeoutError,
     RetryLimitExceededError,
-    TransportError,
 )
 
 T = TypeVar("T")
@@ -134,7 +135,7 @@ class DeadlineTracker:
             return await asyncio.wait_for(
                 awaitable, timeout=float(self._policy.response_timeout_sec)
             )
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             raise PeerTimeoutError(
                 f"no response within {self._policy.response_timeout_sec}s; "
                 f"a missed deadline is a failure, not a reason to wait longer"
@@ -204,7 +205,5 @@ class Watchdog:
         if task is None:
             return
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass

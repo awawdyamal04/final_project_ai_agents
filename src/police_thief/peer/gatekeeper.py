@@ -23,10 +23,9 @@ slot is a peer that stops sending after N failures and never recovers.
 
 from __future__ import annotations
 
-import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator
 
 from police_thief.config.models import SharedConfig
 from police_thief.peer.clock import Clock, SystemClock

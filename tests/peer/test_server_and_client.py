@@ -10,7 +10,6 @@ import pytest
 from fastmcp import Client
 
 from police_thief.domain.enums import Role
-from police_thief.peer.states import PeerState
 from police_thief.protocol.messages import MessageType, new_envelope
 from police_thief.protocol.versions import SOFTWARE_VERSION
 from tests.peer.conftest import build_peer, real_client

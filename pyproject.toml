@@ -10,10 +10,20 @@ dependencies = [
     # accepting a URL or a FastMCP instance, and client.call_tool(...) ->
     # CallToolResult with .data / .is_error, raising ToolError on failure.
     "fastmcp==3.4.5",
+    # Used only by --gui --screenshot, to grab the live window as a real PNG
+    # (the full window: board, banner, status panel, legend -- not just the
+    # canvas). The API used is exactly ImageGrab.grab(bbox=...) and
+    # Image.save(path); that surface has been stable across Pillow releases
+    # for years, so a floor version is enough (unlike fastmcp above, whose
+    # exact-pin exists because its API is genuinely narrow and fragile).
+    # Kept as a base dependency, not a separate extra, so requirements.txt's
+    # `-e .[dev]` keeps installing everything the CLI needs without a second
+    # extras mechanism to keep in sync.
+    "Pillow>=10.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.16"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -27,3 +37,22 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E/F/W: pyflakes + pycodestyle core. I: import sorting. UP: pyupgrade.
+# B: bugbear (common real bugs). C4: comprehension cleanups. SIM: simplifiable
+# code. Chosen to catch real mistakes without forcing a house-style rewrite of
+# an already-consistent codebase.
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+    # StrEnum migration. `Role`, `Direction` etc. are deliberately
+    # `class X(str, Enum)` (see domain/enums.py) because the wire protocol,
+    # canonical JSON and config hashing all depend on exact `str`/`.value`
+    # behaviour. Swapping the base class is a design decision (DECISIONS.md),
+    # never an automated lint fix.
+    "UP042",
+]

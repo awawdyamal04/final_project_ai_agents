@@ -380,3 +380,52 @@ def test_tracker_keeps_recent_cells_bounded(cfg, board):
     for i in range(50):
         tracker.note_own_position(Coordinate(i % 7, 0))
     assert len(tracker.recent_cells) <= 8
+
+
+# ----------------------------------------------------------------------
+# load_strategy -- the config-driven `[strategy]` override
+# ----------------------------------------------------------------------
+
+
+def test_load_strategy_with_no_override_returns_the_shipped_default():
+    from police_thief.strategy.heuristics import CopStrategy, ThiefStrategy, load_strategy
+
+    assert isinstance(load_strategy("police", None), CopStrategy)
+    assert isinstance(load_strategy("thief", ""), ThiefStrategy)
+
+
+def test_load_strategy_imports_a_configured_class():
+    from police_thief.strategy.heuristics import load_strategy
+    from tests.strategy._dummy_brain import DummyBrain
+
+    brain = load_strategy("police", "tests.strategy._dummy_brain:DummyBrain")
+    assert isinstance(brain, DummyBrain)
+    assert brain.name == "dummy-brain"
+
+
+def test_load_strategy_rejects_a_malformed_path():
+    from police_thief.strategy.heuristics import StrategyLoadError, load_strategy
+
+    with pytest.raises(StrategyLoadError):
+        load_strategy("police", "not-a-valid-path")
+
+
+def test_load_strategy_rejects_an_unimportable_module():
+    from police_thief.strategy.heuristics import StrategyLoadError, load_strategy
+
+    with pytest.raises(StrategyLoadError):
+        load_strategy("police", "no.such.module:Whatever")
+
+
+def test_load_strategy_rejects_a_missing_class():
+    from police_thief.strategy.heuristics import StrategyLoadError, load_strategy
+
+    with pytest.raises(StrategyLoadError):
+        load_strategy("police", "tests.strategy._dummy_brain:NoSuchClass")
+
+
+def test_load_strategy_rejects_a_class_that_does_not_implement_the_protocol():
+    from police_thief.strategy.heuristics import StrategyLoadError, load_strategy
+
+    with pytest.raises(StrategyLoadError):
+        load_strategy("police", "tests.strategy._dummy_brain:NotABrain")

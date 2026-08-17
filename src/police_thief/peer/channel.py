@@ -25,8 +25,10 @@ inboxes, nothing shared.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
@@ -98,7 +100,7 @@ class TransportChannel:
             )
         try:
             await asyncio.wait_for(self._connected.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return False
         return True
 
@@ -109,10 +111,8 @@ class TransportChannel:
         if task is None:
             return
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
-        except (asyncio.CancelledError, Exception):
-            pass
         self._connected.clear()
 
     # ------------------------------------------------------------------
@@ -223,13 +223,12 @@ class TransportChannel:
 
     async def call(self, tool: str, arguments: Mapping[str, Any]) -> Any:
         """Ask this channel's worker to invoke a tool."""
-        if self._task is None or self._task.done():
-            if not await self.open(timeout=5.0) and (
-                self._task is None or self._task.done()
-            ):
-                raise PeerUnavailableError(
-                    f"{self.name} channel is not running"
-                )
+        if (
+            (self._task is None or self._task.done())
+            and not await self.open(timeout=5.0)
+            and (self._task is None or self._task.done())
+        ):
+            raise PeerUnavailableError(f"{self.name} channel is not running")
 
         loop = asyncio.get_running_loop()
         request = _Request(tool=tool, arguments=dict(arguments), future=loop.create_future())

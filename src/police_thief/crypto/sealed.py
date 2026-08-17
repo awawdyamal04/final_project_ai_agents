@@ -40,8 +40,9 @@ itself -- it binds the commitment to a position without disclosing one.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from police_thief.config.canonical import canonical_json_bytes
 from police_thief.config.hashing import sha256_hex

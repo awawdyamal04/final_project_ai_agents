@@ -13,12 +13,13 @@ fixed action ordering so the result is deterministic. Every candidate comes from
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib import import_module
 
 from police_thief.domain.actions import Action, Move, PlaceBarrier
 from police_thief.domain.coordinates import Coordinate
 from police_thief.domain.enums import Direction
 from police_thief.domain.rules import legal_actions, legal_moves
-from police_thief.strategy.base import LocalView
+from police_thief.strategy.base import BaseStrategy, LocalView
 
 LOOP_PENALTY = 2.5
 """Cost per recent visit to a candidate cell. Large enough to break a two-cell
@@ -186,3 +187,53 @@ class ThiefStrategy:
 def strategy_for(role_value: str) -> CopStrategy | ThiefStrategy:
     """The shipped default policy for a role."""
     return CopStrategy() if role_value == "police" else ThiefStrategy()
+
+
+class StrategyLoadError(RuntimeError):
+    """A configured ``[strategy]`` class path could not be loaded or is invalid."""
+
+
+def load_strategy(role_value: str, class_path: str | None) -> BaseStrategy:
+    """The strategy to run for this role: a configured override, or the default.
+
+    ``class_path`` is the private config's ``[strategy] police_class`` /
+    ``thief_class`` value (``config/*.toml.example``), in
+    ``"module.path:ClassName"`` form -- a team's own brain, swapped in without
+    touching the orchestrator. Empty or unset means the shipped heuristic
+    (D-14).
+
+    Fails loudly rather than falling back silently. A team that configured a
+    custom brain and silently got the shipped default instead would not find
+    out until it lost with the wrong strategy on the board; that is exactly
+    the class of bug the config-hash mismatch check (E-11) exists to catch one
+    layer up, so an override that cannot be loaded is a startup failure here
+    too, not a quiet substitution.
+    """
+    if not class_path:
+        return strategy_for(role_value)
+
+    module_name, _, class_name = class_path.partition(":")
+    if not module_name or not class_name:
+        raise StrategyLoadError(
+            f"strategy class path {class_path!r} must be 'module.path:ClassName'"
+        )
+    try:
+        module = import_module(module_name)
+    except ImportError as exc:
+        raise StrategyLoadError(
+            f"cannot import module {module_name!r} for strategy {class_path!r}: {exc}"
+        ) from exc
+    try:
+        brain_class = getattr(module, class_name)
+    except AttributeError as exc:
+        raise StrategyLoadError(
+            f"module {module_name!r} has no class {class_name!r}"
+        ) from exc
+
+    brain = brain_class()
+    if not callable(getattr(brain, "choose", None)) or not hasattr(brain, "name"):
+        raise StrategyLoadError(
+            f"{class_path!r} does not implement the BaseStrategy protocol "
+            "(needs .choose(view) and .name)"
+        )
+    return brain

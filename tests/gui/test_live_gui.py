@@ -1,4 +1,10 @@
-"""Live GUI: the information boundary, rendering, and clean shutdown."""
+"""Live GUI: the information boundary, rendering, and the publish loop.
+
+Q-19-specific coverage (banner GAME COMPLETE fix, screenshot trigger,
+Ctrl+C/close shutdown) moved out to ``test_gui_banner.py``,
+``test_capture_trigger.py`` and ``test_gui_shutdown.py`` (150-line
+compliance pass, D-44); this file keeps the pre-existing Phase 7 material.
+"""
 
 from __future__ import annotations
 
@@ -10,17 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from police_thief.gui import view_model as vm_module
 from police_thief.gui.view_model import FORBIDDEN_VIEW_FIELDS, LiveView, snapshot
 from police_thief.peer.states import PeerState
-from tests.peer.conftest import build_peer
 from tests.peer.test_orchestrator import drive_to_ready
-
-
-@pytest.fixture
-def peer(shared, cop_private):
-    return build_peer(shared, cop_private)
-
 
 # ----------------------------------------------------------------------
 # The boundary
@@ -217,6 +215,11 @@ def test_banner_locks_once_committed(peer):
         )
     finally:
         window.close()
+
+
+# ----------------------------------------------------------------------
+# The publish loop
+# ----------------------------------------------------------------------
 
 
 class _StubGui:

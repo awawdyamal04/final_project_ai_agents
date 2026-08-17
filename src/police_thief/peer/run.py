@@ -12,18 +12,21 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import signal
 import sys
 import threading
 from pathlib import Path
 
 from police_thief.audit.writer import AuditLog
-from police_thief.crypto.exceptions import CommitmentMismatchError
 from police_thief.config.exceptions import ConfigError
 from police_thief.config.loader import load_private_config, load_shared_config
+from police_thief.crypto.exceptions import CommitmentMismatchError
 from police_thief.peer.client import PeerClient
 from police_thief.peer.clock import SystemClock
 from police_thief.peer.events import JsonlEventSink
+from police_thief.peer.gui_cli import GUI_DELAY_MAX_SEC, gui_delay_seconds
+from police_thief.peer.gui_runtime import _mark_gui_finished, _maybe_gui_pause
 from police_thief.peer.orchestrator import PeerOrchestrator
 from police_thief.peer.server import PeerServer
 from police_thief.peer.states import PeerState
@@ -77,6 +80,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "open the live window. Shows local truth only; headless without "
             "it, so tests and CI runs are unchanged."
+        ),
+    )
+    parser.add_argument(
+        "--gui-delay",
+        type=gui_delay_seconds,
+        default=0.0,
+        metavar="SECONDS",
+        help=(
+            "pause this many seconds between completed turns, for a human "
+            "watching --gui to keep up (default 0 = no pause). Ignored "
+            f"without --gui. 0 to {GUI_DELAY_MAX_SEC:g} inclusive; the pause "
+            "runs strictly between turns, after commit/reveal/audit for the "
+            "finished turn and before the next turn's protocol messages -- "
+            "it never extends a deadline, timeout, or the final reveal."
         ),
     )
     parser.add_argument(
@@ -188,10 +205,8 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
             except (NotImplementedError, AttributeError, ValueError):
                 # Windows ProactorEventLoop does not support
                 # add_signal_handler; KeyboardInterrupt still propagates.
-                try:
+                with contextlib.suppress(ValueError):
                     signal.signal(sig, _request_stop)
-                except ValueError:
-                    pass
 
     gui_task = None
     gui_stop = asyncio.Event()
@@ -199,6 +214,11 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
         from police_thief.gui.live import run_gui
         from police_thief.gui.view_model import snapshot
 
+        # Lets the Tk main thread ask *this* loop to set `stop` -- safely,
+        # via call_soon_threadsafe -- when the window is closed or Ctrl+C
+        # lands there. Without this, neither trigger ever reached `stop` at
+        # all under --gui (see ViewSlot.request_stop).
+        gui_slot.bind_stop(asyncio.get_running_loop(), stop)
         gui_task = asyncio.create_task(
             run_gui(gui_slot, lambda: snapshot(orchestrator), gui_stop)
         )
@@ -241,6 +261,19 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
 
         if exit_code == EXIT_OK and args.turns:
             exit_code = await _play_turns(orchestrator, args)
+            if exit_code == EXIT_OK and gui_slot is not None:
+                # All configured turns, the final reveal, the mutual audit and
+                # the audit-chain verification have already succeeded inside
+                # _play_turns by the time it returns EXIT_OK. Publish the
+                # observer-only completion view now -- before --hold's
+                # indefinite wait below -- rather than only at process
+                # shutdown (Q-19): a peer sitting in --hold was showing the
+                # last ordinary turn_complete snapshot (banner: YOUR TURN) for
+                # the entire time a person was actually looking at the
+                # window, because final_status was previously set only in
+                # this function's `finally` block, which does not run until
+                # after Ctrl+C ends the hold.
+                _mark_gui_finished(orchestrator, gui_slot, exit_code)
 
         if args.hold and exit_code == EXIT_OK:
             print("  holding; Ctrl+C to stop")
@@ -249,14 +282,12 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
         pass
     finally:
         if gui_slot is not None:
-            orchestrator.final_status = (
-                "finished - see terminal for audit result"
-                if exit_code == EXIT_OK
-                else f"failed: {orchestrator.failure or 'see terminal'}"
-            )
-            from police_thief.gui.view_model import snapshot as _snap
-
-            gui_slot.publish(_snap(orchestrator))
+            # Idempotent with the publish above: covers the failure paths
+            # (handshake/turn failure, where the block above never runs) and
+            # the case with no --hold (turns finish, no wait, straight to
+            # shutdown), and is a harmless no-op re-publish of the same
+            # status otherwise.
+            _mark_gui_finished(orchestrator, gui_slot, exit_code)
             await asyncio.sleep(0.6)  # let the main thread draw the last frame
             gui_stop.set()
             if gui_task is not None:
@@ -292,6 +323,11 @@ async def _play_turns(orchestrator, args) -> int:
                 f"  turn {turn:<3}       commit {commitment[:16]}… "
                 f"| opponent revealed {opponent_action}"
             )
+            # Strictly after this turn's commit/reveal/audit-log write and
+            # before the next turn's protocol messages -- see
+            # _maybe_gui_pause's docstring for why this cannot touch a
+            # deadline.
+            await _maybe_gui_pause(args, orchestrator, turn)
     except CryptoError as exc:
         print(f"  turn           FAILED: {exc}", file=sys.stderr)
         return EXIT_HANDSHAKE_FAILED
@@ -356,67 +392,14 @@ def _corrupt_final_reveal(orchestrator, what: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.gui:
+        from police_thief.peer.gui_main import _main_with_gui
+
         return _main_with_gui(args)
     try:
         return asyncio.run(run_peer(args))
     except KeyboardInterrupt:
         print("interrupted", file=sys.stderr)
         return EXIT_OK
-
-
-def _main_with_gui(args: argparse.Namespace) -> int:
-    """Tk owns the main thread; the peer's asyncio loop runs in a worker.
-
-    Tk cannot be driven from a worker thread -- it crashes the interpreter on
-    Windows -- and cannot be pumped from the asyncio loop, which stalls commit
-    exchanges past their deadline and fails turns. Giving it the main thread is
-    the arrangement that works, and it is what the architecture notes describe.
-    """
-    import threading
-
-    from police_thief.config.loader import load_shared_config
-    from police_thief.gui.capture import save_window_png
-    from police_thief.gui.live import PeerWindow, ViewSlot, drive_on_main_thread
-
-    try:
-        shared = load_shared_config(args.shared)
-        private = load_private_config(args.private)
-    except ConfigError as exc:
-        print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
-        return EXIT_CONFIG_ERROR
-
-    try:
-        window = PeerWindow(
-            f"police-thief - {private.role.value}", shared.grid_size
-        )
-    except Exception as exc:
-        print(f"  gui            unavailable ({type(exc).__name__}); headless")
-        return asyncio.run(run_peer(args))
-
-    slot = ViewSlot()
-    result: dict[str, int] = {}
-
-    def worker() -> None:
-        try:
-            result["code"] = asyncio.run(run_peer(args, gui_slot=slot))
-        except KeyboardInterrupt:
-            result["code"] = EXIT_OK
-        except Exception as exc:  # pragma: no cover - defensive
-            print(f"peer failed: {type(exc).__name__}: {exc}", file=sys.stderr)
-            result["code"] = EXIT_HANDSHAKE_FAILED
-        finally:
-            slot.stop()
-
-    thread = threading.Thread(target=worker, name="peer", daemon=True)
-    thread.start()
-    drive_on_main_thread(window, slot)
-    thread.join(timeout=60)
-
-    if args.screenshot:
-        saved = save_window_png(window, args.screenshot)
-        print(f"  screenshot     {saved or 'unavailable'}")
-    window.close()
-    return result.get("code", EXIT_HANDSHAKE_FAILED)
 
 
 if __name__ == "__main__":  # pragma: no cover

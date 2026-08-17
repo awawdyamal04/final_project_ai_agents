@@ -23,7 +23,6 @@ from police_thief.domain.state import FORBIDDEN_STATE_FIELDS, LocalState
 from police_thief.sim.harness import MatchHarness
 from police_thief.sim.policies import cycle_directions, first_legal_move
 
-
 # ----------------------------------------------------------------------
 # The state object itself
 # ----------------------------------------------------------------------
@@ -60,7 +59,7 @@ def test_slots_prevent_attaching_an_opponent_position_at_runtime(cop_state):
     assignment through different paths -- so the assertion is that it fails and
     that the attribute still does not exist, not that it fails a particular way.
     """
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 -- exact type deliberately unchecked, see docstring
         cop_state.opponent_position = Coordinate(3, 3)  # type: ignore[attr-defined]
     assert not hasattr(cop_state, "opponent_position")
 

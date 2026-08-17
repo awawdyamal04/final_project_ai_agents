@@ -23,7 +23,6 @@ from police_thief.protocol.exceptions import (
     RetryLimitExceededError,
 )
 
-
 # ----------------------------------------------------------------------
 # Gatekeeper
 # ----------------------------------------------------------------------

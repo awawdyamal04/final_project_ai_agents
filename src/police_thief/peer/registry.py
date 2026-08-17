@@ -21,8 +21,9 @@ long league series would eventually find.
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from police_thief.config.canonical import canonical_json_bytes
 from police_thief.protocol.exceptions import ConflictingDuplicateError

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from police_thief.config.verify import main
 
 
@@ -91,7 +89,7 @@ def test_private_config_does_not_change_the_printed_hash(
     def digest_line(argv):
         main(argv)
         out = capsys.readouterr().out
-        return next(l for l in out.splitlines() if "config_sha256" in l)
+        return next(line for line in out.splitlines() if "config_sha256" in line)
 
     alone = digest_line(["--shared", str(shared_path)])
     with_cop = digest_line(

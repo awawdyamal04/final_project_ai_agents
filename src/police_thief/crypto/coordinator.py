@@ -28,21 +28,21 @@ breaking E-18.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 from police_thief.crypto.exceptions import (
     CommitAlreadyExistsError,
     CommitmentMismatchError,
     ConflictingCommitError,
     ConflictingRevealError,
+    FutureTurnMessageError,
     InvalidRevealError,
     MissingCommitError,
-    NonceReuseError,
     RevealNotAllowedError,
     SealedRecordValidationError,
     StaleTurnMessageError,
-    FutureTurnMessageError,
 )
 from police_thief.crypto.nonce import NonceGuard
 from police_thief.crypto.sealed import (

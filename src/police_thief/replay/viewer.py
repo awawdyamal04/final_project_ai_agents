@@ -17,7 +17,6 @@ asserted by ``tests/replay/test_two_log_replay.py``.
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 from police_thief.config.loader import load_shared_config

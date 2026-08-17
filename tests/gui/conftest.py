@@ -40,3 +40,14 @@ def peer_pair(shared, cop_private, thief_private):
     cop.client.target = thief.server
     thief.client.target = cop.server
     return cop, thief
+
+
+@pytest.fixture
+def peer(shared, cop_private):
+    """A single unpaired peer -- enough for view-model/rendering tests that
+    never need a real handshake. Shared here (D-44 150-line compliance pass)
+    since several gui test modules now use it; was previously defined
+    locally in test_live_gui.py only."""
+    from tests.peer.conftest import build_peer
+
+    return build_peer(shared, cop_private)

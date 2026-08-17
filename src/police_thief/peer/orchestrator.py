@@ -42,7 +42,7 @@ from police_thief.crypto.exceptions import (
 )
 from police_thief.crypto.sealed import local_state_hash
 from police_thief.domain.actions import Action, PlaceBarrier
-from police_thief.domain.enums import Role
+from police_thief.domain.enums import CaptureReason, Role
 from police_thief.domain.exceptions import DomainError
 from police_thief.domain.simultaneity import (
     BLOCKED_MOVE_BECOMES_STAY,
@@ -50,6 +50,8 @@ from police_thief.domain.simultaneity import (
 )
 from police_thief.domain.state import LocalState
 from police_thief.domain.transition import apply_action, observe_barrier
+from police_thief.peer.capture_claim_runtime import CaptureClaimRuntime
+from police_thief.peer.capture_claim_thief import handle_claim as _handle_capture_claim
 from police_thief.peer.client import PeerClient
 from police_thief.peer.clock import Clock, SystemClock
 from police_thief.peer.deadline import RetryPolicy, Watchdog
@@ -63,6 +65,7 @@ from police_thief.peer.pending import (
 from police_thief.peer.registry import MessageRegistry
 from police_thief.peer.states import PeerState, PeerStateMachine
 from police_thief.protocol.action_codec import decode_action, encode_action
+from police_thief.protocol.capture_claim import CaptureClaimResponse
 from police_thief.protocol.exceptions import (
     ConflictingDuplicateError,
     InvalidPeerStateError,
@@ -148,6 +151,11 @@ class PeerOrchestrator:
         self.failure: str | None = None
         self.crypto = CommitRevealCoordinator(
             game_id=self.game_id, role=self.role
+        )
+        # Live capture_claim (E-21, E-22) -- composed like self.crypto/self.audit
+        # (D-44's sibling-module pattern), not inlined here.
+        self.capture_claims = CaptureClaimRuntime(
+            game_id=self.game_id, role=self.role, sub_game=1, audit=self.audit
         )
         self.last_opponent_action: Action | None = None
         # Belief and scent about the opponent, plus the shipped default policy.
@@ -267,6 +275,9 @@ class PeerOrchestrator:
 
         if kind is MessageType.FINAL_REVEAL:
             return self._on_final_reveal(envelope)
+
+        if kind is MessageType.CAPTURE_CLAIM:
+            return self._on_capture_claim(envelope)
 
         if kind is MessageType.TURN_ABORT:
             self.crypto.abandon_turn("opponent aborted")
@@ -545,6 +556,44 @@ class PeerOrchestrator:
             verified_turns=len(verified),
         )
 
+    def _on_capture_claim(self, envelope: Envelope) -> Mapping[str, Any]:
+        """Thief side of live capture_claim (E-21): answer truthfully.
+
+        Delegates to ``peer/capture_claim_thief.py``; this method only
+        supplies this peer's own state (never the opponent's -- E-8/E-9) and
+        turns the resulting :class:`CaptureClaimResponse` into a reply
+        envelope, the same idiom every other ``_on_*`` handler uses.
+
+        ``barrier_cell`` comes from ``self.last_opponent_action`` -- set by
+        ``_on_reveal`` from the cop's own revealed action, so it is public
+        (E-15/E-16), not reconstructed. ``movement`` is not supplied: a
+        ``landed`` claim needs the cop's true position, which this peer
+        never legitimately has (E-8/E-9); see
+        ``domain/capture_claim.py``/``CaptureClaimUnverifiableError``.
+        """
+        latest_completed = (
+            max(self.crypto.completed_turns) if self.crypto.completed_turns else 0
+        )
+        barrier_cell = (
+            self.last_opponent_action.cell
+            if isinstance(self.last_opponent_action, PlaceBarrier)
+            else None
+        )
+        response = _handle_capture_claim(
+            self.capture_claims,
+            envelope,
+            thief_state=self.state,
+            config=self.shared,
+            latest_completed_turn=latest_completed,
+            barrier_cell=barrier_cell,
+        )
+        self.events.emit("capture_claim_answered", verdict=response.verdict)
+        return _ok(
+            envelope,
+            MessageType.CAPTURE_CLAIM_RESPONSE,
+            **response.to_payload(),
+        )
+
     # ------------------------------------------------------------------
     # Outbound: the cryptographic turn
     # ------------------------------------------------------------------
@@ -808,6 +857,31 @@ class PeerOrchestrator:
                 f"the opponent rejected our final reveal: {reply.error}"
             )
         return int(reply.envelope.payload.get("verified_turns", 0))
+
+    async def claim_capture(
+        self, turn: int, reason: CaptureReason
+    ) -> CaptureClaimResponse:
+        """Cop side of live capture_claim (E-21, E-22): declare a suspected
+        capture and wait for the thief's truthful confirm/deny.
+
+        Mandatory-initiator only (prd.md Correction 1) -- this method is not
+        exposed for ``Role.THIEF``; callers decide *when* to call it (prd.md
+        Sec 14.17 [C]). A confirmed response sets
+        ``self.capture_claims.pending`` (CLAIM_PENDING_AUDIT); it is the
+        caller's turn loop that must check it and stop, per
+        ``peer/run.py``.
+        """
+        claim = self.capture_claims.build_claim(turn=turn, reason=reason)
+        reply = await self.client.send(
+            self._envelope(
+                MessageType.CAPTURE_CLAIM, turn_number=turn, **claim.to_payload()
+            )
+        )
+        if not reply.ok or reply.envelope is None:
+            raise CommitmentMismatchError(
+                f"the opponent rejected our capture claim: {reply.error}"
+            )
+        return self.capture_claims.record_response(reply.envelope)
 
     # ------------------------------------------------------------------
     # Outbound: the handshake we drive

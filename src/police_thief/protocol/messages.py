@@ -79,6 +79,13 @@ class MessageType(str, Enum):
     TURN_ABORT = "turn_abort"
     CRYPTO_ERROR = "crypto_error"
 
+    # --- capture_claim (E-21, E-22) -- see protocol/capture_claim.py -----
+    CAPTURE_CLAIM = "capture_claim"
+    """Cop -> thief only (mandatory initiator, Correction 1)."""
+
+    CAPTURE_CLAIM_RESPONSE = "capture_claim_response"
+    """Thief -> cop. ``confirm``/``deny`` only -- never a coordinate."""
+
 
 ENVELOPE_KEYS: frozenset[str] = frozenset(
     {
@@ -167,6 +174,19 @@ _PAYLOAD_SCHEMAS: dict[MessageType, dict[str, tuple[type | tuple[type, ...], boo
         "code": (str, True),
         "detail": (str, True),
     },
+    # capture_claim: no coordinate, no cell, no nonce -- prd.md Sec 14.6/14.7.
+    MessageType.CAPTURE_CLAIM: {
+        "claim_id": (str, True),
+        "sub_game": (int, True),
+        "claim_kind": (str, True),
+        "commitment": (str, True),
+    },
+    MessageType.CAPTURE_CLAIM_RESPONSE: {
+        "claim_id": (str, True),
+        "sub_game": (int, True),
+        "verdict": (str, True),
+        "commitment": (str, True),
+    },
 }
 
 CRYPTO_MESSAGE_TYPES: frozenset[MessageType] = frozenset(
@@ -188,6 +208,8 @@ TURN_BEARING_MESSAGE_TYPES: frozenset[MessageType] = frozenset(
         MessageType.COMMIT_ACK,
         MessageType.REVEAL,
         MessageType.REVEAL_ACK,
+        MessageType.CAPTURE_CLAIM,
+        MessageType.CAPTURE_CLAIM_RESPONSE,
     }
 )
 """Types that must carry a ``turn_number``; validated on ingress."""

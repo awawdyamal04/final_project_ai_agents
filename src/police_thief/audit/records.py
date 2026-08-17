@@ -48,6 +48,10 @@ class AuditEventType(str, Enum):
     AUDIT_RESULT = "audit_result"
     SUB_GAME_END = "sub_game_end"
 
+    # --- capture_claim (E-21, E-22) -- see peer/capture_claim_runtime.py -
+    CAPTURE_CLAIM = "capture_claim"
+    CAPTURE_CLAIM_RESPONSE = "capture_claim_response"
+
 
 @dataclass(frozen=True, slots=True)
 class AuditRecord:

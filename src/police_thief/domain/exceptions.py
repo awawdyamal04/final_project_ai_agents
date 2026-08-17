@@ -72,3 +72,18 @@ class GameAlreadyFinishedError(DomainError):
 
 class InvalidTransitionError(DomainError):
     """The transition function was called with inconsistent inputs."""
+
+
+class CaptureClaimUnverifiableError(DomainError):
+    """A ``landed`` capture claim cannot be truthfully answered live.
+
+    The thief can fully self-verify ``barrier_on_thief``/``no_legal_move``
+    from its own ``LocalState`` alone, but ``landed`` (cop-on-thief
+    collision) needs the cop's true position, which E-8/E-9 structurally
+    forbid disclosing. Rather than guess -- a false ``deny`` would itself
+    violate E-21 -- the caller must supply the reconstructed movement
+    explicitly (see ``domain/capture_claim.py``); this is raised rather
+    than defaulting to an unverified answer. The offline replay/audit
+    remains authoritative for this ground (prd.md Sec 14.11/14.12; D-41
+    augmented, not replaced).
+    """

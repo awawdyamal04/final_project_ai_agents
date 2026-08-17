@@ -328,6 +328,14 @@ async def _play_turns(orchestrator, args) -> int:
             # _maybe_gui_pause's docstring for why this cannot touch a
             # deadline.
             await _maybe_gui_pause(args, orchestrator, turn)
+            if orchestrator.capture_claims.pending:
+                # CLAIM_PENDING_AUDIT (prd.md Sec 14.13, OUR DESIGN DECISION):
+                # a confirmed capture_claim stops new turns, but Final Reveal
+                # and mutual audit below still run unconditionally -- the
+                # offline replay remains the authoritative terminal call
+                # (D-41, augmented not replaced).
+                print("  capture_claim  CONFIRMED -- stopping turn loop, audit still runs")
+                break
     except CryptoError as exc:
         print(f"  turn           FAILED: {exc}", file=sys.stderr)
         return EXIT_HANDSHAKE_FAILED

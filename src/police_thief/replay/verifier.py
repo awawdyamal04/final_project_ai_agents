@@ -61,6 +61,7 @@ from police_thief.domain.terminal import (
 )
 from police_thief.domain.transition import apply_action, observe_barrier
 from police_thief.protocol.action_codec import decode_action
+from police_thief.replay.capture_claim_check import check_capture_claims
 
 
 class Verdict(str, Enum):
@@ -475,6 +476,12 @@ def _reconstruct(
                     f"{label} claimed {key}={claimed[key]!r}, "
                     f"reconstruction gives {recomputed!r}"
                 )
+
+    # capture_claim (E-21, E-22): augments the check above, does not replace
+    # it -- a sub_game with no claims at all yields no extra disagreements.
+    disagreements.extend(
+        check_capture_claims(cop_records, thief_records, terminal)
+    )
 
     if disagreements:
         return ReplayVerdict(

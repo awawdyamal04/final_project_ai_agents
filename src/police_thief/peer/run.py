@@ -16,6 +16,7 @@ import contextlib
 import signal
 import sys
 import threading
+import zlib
 from pathlib import Path
 
 from police_thief.audit.writer import AuditLog
@@ -128,6 +129,21 @@ def _build_parser() -> argparse.ArgumentParser:
             "fast enough that an undrained capture pipe blocks the event loop "
             "(the Q-20 turn-6 freeze). Opt in only when watching a run live."
         ),
+    )
+    parser.add_argument(
+        "--adaptive-learning",
+        action="store_true",
+        help=(
+            "load results/learning profiles, derive a bounded parameter "
+            "adjustment around the production strategy for this opponent, "
+            "and record legal aggregate observations after a clean finish. "
+            "Off by default -- behaviour is unchanged without this flag."
+        ),
+    )
+    parser.add_argument(
+        "--learning-dir",
+        default="results/learning",
+        help="where learning profiles are read from and saved to",
     )
     return parser
 
@@ -257,6 +273,9 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
     await asyncio.sleep(0.5)
 
     exit_code = EXIT_OK
+    adaptive_model = None  # set below only under --adaptive-learning; must
+    # exist regardless of how far the try block below gets (e.g. Ctrl+C
+    # during the handshake), since _print_match_summary reads it afterward.
     try:
         if not await orchestrator.wait_for_peer(attempts=args.connect_attempts):
             print("  handshake      FAILED (opponent unreachable)", file=sys.stderr)
@@ -281,8 +300,22 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
                 )
                 exit_code = EXIT_HANDSHAKE_FAILED
 
+        if exit_code == EXIT_OK and args.adaptive_learning:
+            from police_thief.learning.integration import prepare_adaptive_strategy
+
+            seed = zlib.crc32(args.game_id.encode("utf-8"))
+            strategy, adaptive_model, lines = prepare_adaptive_strategy(
+                orchestrator.role,
+                Path(args.learning_dir),
+                orchestrator.handshake.opponent_name,
+                seed,
+            )
+            orchestrator.strategy = strategy
+            for line in lines:
+                print(f"  {line}")
+
         if exit_code == EXIT_OK and args.turns:
-            exit_code = await _play_turns(orchestrator, args)
+            exit_code = await _play_turns(orchestrator, args, adaptive_model)
             if exit_code == EXIT_OK and gui_slot is not None:
                 # All configured turns, the final reveal, the mutual audit and
                 # the audit-chain verification have already succeeded inside
@@ -321,12 +354,12 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
         print(f"  shutdown       {orchestrator.machine.state.value}")
 
     if args.turns:
-        _print_match_summary(orchestrator, args, exit_code, private)
+        _print_match_summary(orchestrator, args, exit_code, private, adaptive_model)
 
     return exit_code
 
 
-def _print_match_summary(orchestrator, args, exit_code: int, private) -> None:
+def _print_match_summary(orchestrator, args, exit_code: int, private, adaptive_model=None) -> None:
     """Compact end-of-match status (league readiness Priority 4), plus the
     local JSON report + league index (Priority 5/6). Never fabricates a
     winner or score -- a live peer structurally cannot know it (E-8/E-9);
@@ -362,6 +395,23 @@ def _print_match_summary(orchestrator, args, exit_code: int, private) -> None:
     report.gmail_status = mail_status
     write_report(report)  # re-persist with the real, final gmail_status
 
+    learning_line = None
+    if args.adaptive_learning and adaptive_model is not None:
+        from police_thief.learning.integration import record_match_outcome
+
+        learning_status = record_match_outcome(
+            role=orchestrator.role,
+            learning_dir=Path(args.learning_dir),
+            declared_opponent_name=orchestrator.handshake.opponent_name,
+            opponent_model=adaptive_model,
+            turns_played=turns_played,
+            exit_status=status,
+        )
+        # Promotion is a deliberate, separate offline benchmark step (see
+        # scripts/learning_promote.py) -- far too slow to run inside a real
+        # match, so it is never silently evaluated here.
+        learning_line = f"{learning_status}\n  candidate promotion: not evaluated"
+
     print("  " + "=" * 50)
     print(f"  {status}")
     print(f"  game id        {args.game_id}")
@@ -373,15 +423,23 @@ def _print_match_summary(orchestrator, args, exit_code: int, private) -> None:
     print(f"  score/result   {report.score}")
     print(f"  gmail          {mail_status}")
     print(f"  report saved   {report_path}")
+    if learning_line is not None:
+        print(f"  {learning_line}")
     print("  " + "=" * 50)
     del sent  # status text already reflects it; kept for clarity at call site
 
 
-async def _play_turns(orchestrator, args) -> int:
+async def _play_turns(orchestrator, args, adaptive_model=None) -> int:
     """Play N cryptographic turns, then exchange final reveals and audit.
 
     Each peer's own strategy chooses the action from its own belief and the
     opponent's scent. Nothing else is available to it.
+
+    ``adaptive_model`` (an :class:`OpponentModel`, only set under
+    ``--adaptive-learning``) is fed one legal ``LocalView`` per turn here for
+    the police role only -- the thief's adaptive strategy already owns and
+    updates this same instance itself inside ``choose()`` (see
+    ``RiskThiefStrategy``), so observing it again here would double-count.
     """
     from police_thief.audit.verifier import verify_chain_file
     from police_thief.crypto.exceptions import CryptoError
@@ -393,6 +451,8 @@ async def _play_turns(orchestrator, args) -> int:
             # No hint passed: the peer's own verbal layer composes one, and
             # decides for itself whether this turn's is truthful.
             opponent_action = await orchestrator.play_turn(turn)
+            if adaptive_model is not None and orchestrator.role.value == "police":
+                adaptive_model.observe(orchestrator.tracker.view(orchestrator.state))
             crypto_turn = orchestrator.crypto.completed_turns[turn]
             commitment = crypto_turn.local_commitment
             print(

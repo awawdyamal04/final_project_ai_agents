@@ -14,6 +14,13 @@ token.json
 secrets/
 .secrets/
 
+# Per-peer private config (opponent URLs, group identity) -- copied from the
+# *.example templates and edited locally for each match/opponent. Never the
+# shared, signed config/game.json, which stays tracked.
+config/police/game.toml
+config/thief/game.toml
+config/*/game.toml
+
 # ---------------------------------------------------------------------------
 # COURSE MATERIAL — do not redistribute.
 # The specification PDF is the lecturer's copyrighted work ("all rights

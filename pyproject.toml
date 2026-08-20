@@ -20,6 +20,9 @@ dependencies = [
     # `-e .[dev]` keeps installing everything the CLI needs without a second
     # extras mechanism to keep in sync.
     "Pillow>=10.0",
+    "google-api-python-client>=2.198.0",
+    "google-auth-httplib2>=0.4.1",
+    "google-auth-oauthlib>=1.4.0",
 ]
 
 [project.optional-dependencies]

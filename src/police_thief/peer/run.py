@@ -75,6 +75,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="play N cryptographic commit-reveal turns after READY",
     )
     parser.add_argument(
+        "--opponent-url",
+        default=None,
+        help=(
+            "override [network].opponent_url from --private for this run "
+            "only -- switch opponents (e.g. to a tunnelled https:// URL) "
+            "without editing the TOML file"
+        ),
+    )
+    parser.add_argument(
         "--gui",
         action="store_true",
         help=(
@@ -130,6 +139,19 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
     except ConfigError as exc:
         print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
+
+    if args.opponent_url:
+        # CLI override only -- the TOML file on disk is never rewritten, so
+        # nothing here needs an extra gitignore rule beyond the private file
+        # itself (config/<role>/game.toml).
+        import dataclasses
+
+        private = dataclasses.replace(
+            private,
+            network=dataclasses.replace(
+                private.network, opponent_url=args.opponent_url
+            ),
+        )
 
     role = private.role
     clock = SystemClock()
@@ -298,7 +320,61 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
         await server.stop()
         print(f"  shutdown       {orchestrator.machine.state.value}")
 
+    if args.turns:
+        _print_match_summary(orchestrator, args, exit_code, private)
+
     return exit_code
+
+
+def _print_match_summary(orchestrator, args, exit_code: int, private) -> None:
+    """Compact end-of-match status (league readiness Priority 4), plus the
+    local JSON report + league index (Priority 5/6). Never fabricates a
+    winner or score -- a live peer structurally cannot know it (E-8/E-9);
+    that is offline replay's job (D-41), never imported here."""
+    from police_thief.reporting.gmail_report import send_report_email
+    from police_thief.reporting.match_report import MatchReport, write_report
+
+    status = "MATCH COMPLETE" if exit_code == EXIT_OK else "TECHNICAL LOSS"
+    turns_played = len(orchestrator.crypto.completed_turns)
+    audit_status = "N/A (no turns completed)"
+    if orchestrator.audit is not None and turns_played:
+        from police_thief.audit.verifier import verify_chain_file
+
+        audit_status = verify_chain_file(orchestrator.audit.path).describe()
+
+    report = MatchReport(
+        game_id=args.game_id,
+        role=orchestrator.role.value,
+        opponent_url=private.network.opponent_url,
+        opponent_team=orchestrator.handshake.opponent_name or "unknown",
+        turns_played=turns_played,
+        exit_status=status,
+        audit_status=audit_status,
+    )
+    report_path = write_report(report)  # honest "not attempted" pre-send state
+    sent, mail_status = send_report_email(
+        report,
+        report_path,
+        recipient=private.email.recipient,
+        credentials_path=private.email.credentials_path,
+        token_path=private.email.token_path,
+    )
+    report.gmail_status = mail_status
+    write_report(report)  # re-persist with the real, final gmail_status
+
+    print("  " + "=" * 50)
+    print(f"  {status}")
+    print(f"  game id        {args.game_id}")
+    print(f"  opponent       {report.opponent_team} ({private.network.opponent_url})")
+    print(f"  role           {orchestrator.role.value}")
+    print(f"  turns          {turns_played}")
+    print(f"  audit status   {audit_status}")
+    print(f"  replay status  {report.replay_status}")
+    print(f"  score/result   {report.score}")
+    print(f"  gmail          {mail_status}")
+    print(f"  report saved   {report_path}")
+    print("  " + "=" * 50)
+    del sent  # status text already reflects it; kept for clarity at call site
 
 
 async def _play_turns(orchestrator, args) -> int:

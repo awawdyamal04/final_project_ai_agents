@@ -1,0 +1,80 @@
+{
+  "baseline_cop_vs_baseline_thief": {
+    "label": "baseline_cop_vs_baseline_thief",
+    "games": 500,
+    "police_win_rate": 1.0,
+    "thief_win_rate": 0.0,
+    "technical_loss_rate": 0.0,
+    "avg_terminal_turn": 30.0,
+    "median_terminal_turn": 30.0,
+    "barrier_efficiency": 0.5,
+    "trapped_captures": 500,
+    "barrier_captures": 0,
+    "movement_captures": 0,
+    "invalid_actions": 1000,
+    "avg_cop_mobility": 3.6666666666666914,
+    "avg_thief_mobility": 3.433333333333343,
+    "result_distribution": {
+      "capture": 500
+    }
+  },
+  "new_cop_vs_baseline_thief": {
+    "label": "new_cop_vs_baseline_thief",
+    "games": 500,
+    "police_win_rate": 1.0,
+    "thief_win_rate": 0.0,
+    "technical_loss_rate": 0.0,
+    "avg_terminal_turn": 30.0,
+    "median_terminal_turn": 30.0,
+    "barrier_efficiency": 0.5,
+    "trapped_captures": 500,
+    "barrier_captures": 0,
+    "movement_captures": 0,
+    "invalid_actions": 1000,
+    "avg_cop_mobility": 3.6666666666666914,
+    "avg_thief_mobility": 3.433333333333343,
+    "result_distribution": {
+      "capture": 500
+    }
+  },
+  "baseline_cop_vs_new_thief": {
+    "label": "baseline_cop_vs_new_thief",
+    "games": 500,
+    "police_win_rate": 0.056,
+    "thief_win_rate": 0.944,
+    "technical_loss_rate": 0.0,
+    "avg_terminal_turn": 34.456,
+    "median_terminal_turn": 35.0,
+    "barrier_efficiency": 0.20588235294117646,
+    "trapped_captures": 28,
+    "barrier_captures": 0,
+    "movement_captures": 0,
+    "invalid_actions": 63,
+    "avg_cop_mobility": 3.8429042016806942,
+    "avg_thief_mobility": 3.8401476836888606,
+    "result_distribution": {
+      "survival": 472,
+      "capture": 28
+    }
+  },
+  "new_cop_vs_new_thief": {
+    "label": "new_cop_vs_new_thief",
+    "games": 500,
+    "police_win_rate": 0.054,
+    "thief_win_rate": 0.946,
+    "technical_loss_rate": 0.0,
+    "avg_terminal_turn": 34.37,
+    "median_terminal_turn": 35.0,
+    "barrier_efficiency": 0.21951219512195122,
+    "trapped_captures": 27,
+    "barrier_captures": 0,
+    "movement_captures": 0,
+    "invalid_actions": 61,
+    "avg_cop_mobility": 3.847062691230363,
+    "avg_thief_mobility": 3.847654196293903,
+    "result_distribution": {
+      "survival": 473,
+      "capture": 27
+    }
+  }
+}

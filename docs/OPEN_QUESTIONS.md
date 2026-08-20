@@ -146,6 +146,17 @@ disagreement. The sealed-record schema is therefore part of the pre-match
 agreement and its hash is exchanged at handshake. Reclassified from AMBIGUOUS to
 **resolved in substance, negotiate the encoding**.
 
+**2026-08-20 correction — nonce placement, not field set.** A separate axis
+of the same PDF contradiction (see DECISIONS.md D-4's "Correction" section)
+was found by a cross-team interop-vectors audit
+(`copthief-league-protocol`, external to this project): whether the nonce is
+sealed *inside* the hashed canonical object (this project's original
+implementation, matching the book's ch.5 listing) or pipe-appended *outside*
+it (the book's own reference implementation, and the interop kit's pinned
+CORE form). Both are self-consistent — a peer auditing only its own
+revealed records never notices — so this went unnoticed until checked
+against the reference construction. Fixed to the reference form; see D-4.
+
 ---
 
 ## Q-5 — Three different timeout values, unclear which governs a turn
@@ -640,3 +651,58 @@ FIXED.
 
 Combined with E-52 (only one counting match per opponent), this means: **at
 least 2 distinct opponents, at most 10 distinct opponents.** No contradiction.
+
+---
+
+## Q-21 — Cross-team wire-shape, scent-model and id-derivation gaps found by an external interop audit
+
+**Status: OPEN, non-blocking for the book's own mandatory requirements.**
+Found 2026-08-20 auditing this project against `copthief-league-protocol`
+(an external, unofficial conformance-vectors kit for cross-team play — not
+the book, not a course requirement). Nothing here is a rule violation; each
+item is a *negotiated choice* the interop kit's own SPEC explicitly leaves
+open between two teams (`vectors/`, section 7's locked-model mechanism), or
+a capability that simply does not exist yet in this project because nothing
+in the book requires it standing alone.
+
+1. **Wire shape.** This project's protocol (`MessageType.COMMIT` →
+   `COMMIT_ACK` → `REVEAL` → `REVEAL_ACK` → ... → `FINAL_REVEAL`, an
+   explicit multi-message state machine) is not the interop kit's
+   `reference-v3` shape (`negotiate`/`receive_turn`/`submit_audit`/
+   `receive_control`, one combined message per half-turn). Both are
+   legitimate implementations of the book's commit-reveal requirement (E-17,
+   E-18); they are simply different wire encodings of it. **Not fixed** —
+   rewriting an already-tested protocol to match an external kit with no
+   course standing would be the over-engineering CLAUDE.md §4 warns against.
+   If this project ever plays a real cross-team match against a
+   `reference-v3` peer, the wire shape must be declared/negotiated before
+   play (the interop kit's own recommended mechanism), not assumed.
+2. **Pheromone model.** `domain/scent.py` implements neither of the interop
+   kit's two registered models (a Gaussian fit, `sigma=1.15`, DECISIONS.md
+   D-39, already an explicit project decision) and is missing the upper
+   clamp at `center_intensity` that the book's own ch.4 model declares. Not
+   a cross-team requirement (scent fields are transmitted, not re-derived,
+   per the kit's own SPEC) and not fixed here: adding the clamp changes
+   turn-over-turn scent growth in a way `tests/strategy/
+   test_scent_belief_strategy.py` currently relies on being unbounded.
+   Flagged for a future, deliberate pass rather than folded into this
+   audit's fix set.
+3. **`game_uid`/`game_id`/`terms_signature`.** This project had no
+   equivalent of the interop kit's sorted-pair match identifiers or
+   nonce-signed flat-terms agreement; the book-mandated handshake gate
+   (`config_sha256` over the *whole* shared config, no nonce — PDF p.127,
+   Appendix B) serves a related but different purpose and is unaffected.
+   Added `protocol/interop_ids.py` as small, additive, schema-agnostic
+   functions reproducing the interop kit's vectors byte-for-byte, for use
+   only if this project negotiates with a foreign implementation. **Not
+   wired into the live handshake** — see that module's docstring. Which of
+   this project's own config keys correspond 1:1 to the interop kit's flat
+   14-key `terms` extraction is left unresolved rather than guessed.
+4. **Locked-model declarations.** Not implemented at all (no
+   `scent_model_sha256`/`wire_shape_sha256`/etc. registry). Non-blocking by
+   the interop kit's own rule: omission never refuses, in either direction —
+   an unmodified reference peer also declares nothing.
+
+See `tests/interop/` for the full audit (byte-exact checks against the
+kit's `vectors/`, and documentation-style tests pinning the above as known,
+deliberate current-state facts).

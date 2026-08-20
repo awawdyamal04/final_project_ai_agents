@@ -45,7 +45,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from police_thief.config.canonical import canonical_json_bytes
-from police_thief.config.hashing import sha256_hex
+from police_thief.config.hashing import pipe_nonce_commitment, sha256_hex
 from police_thief.crypto.exceptions import SealedRecordValidationError
 from police_thief.crypto.nonce import is_well_formed
 from police_thief.domain.actions import Action
@@ -131,8 +131,18 @@ class SealedRecord:
         }
 
     def commitment(self) -> str:
-        """``SHA256(canonical_json_bytes(sealed_mapping))``, lowercase hex."""
-        return sha256_hex(canonical_json_bytes(self.to_sealed_mapping()))
+        """``SHA256(canonical_json_bytes(payload_without_nonce) + "|" + nonce)``.
+
+        The nonce is pipe-appended to the canonical bytes rather than sealed
+        as a key inside the hashed object -- the cross-team-conformant
+        "reference form" (copthief-league-protocol interop kit, SPEC
+        section 3; see ``docs/OPEN_QUESTIONS.md`` for the book's own three
+        mutually-inconsistent published commit constructions and why this
+        one is the one an opponent's audit re-hashes against).
+        """
+        mapping = self.to_sealed_mapping()
+        nonce = mapping.pop("nonce")
+        return pipe_nonce_commitment(mapping, nonce)
 
     # ------------------------------------------------------------------
     # The public half -- everything except the nonce
@@ -245,10 +255,16 @@ def commitment_for_mapping(raw: Mapping[str, Any]) -> str:
     """Recompute a commitment from a full sealed mapping.
 
     Used at the final audit: the opponent's revealed fields plus its disclosed
-    nonce are re-hashed and compared against what it committed.
+    nonce are re-hashed and compared against what it committed. Mirrors
+    :meth:`SealedRecord.commitment` exactly -- the nonce is popped out and
+    pipe-appended, never hashed as part of the object -- or a self-consistent
+    but cross-team-incompatible peer could pass its own audit while failing
+    every opponent's.
     """
     validate_sealed_mapping(raw, require_nonce=True)
-    return sha256_hex(canonical_json_bytes(dict(raw)))
+    mapping = dict(raw)
+    nonce = mapping.pop("nonce")
+    return pipe_nonce_commitment(mapping, nonce)
 
 
 def local_state_hash(state_mapping: Mapping[str, Any]) -> str:

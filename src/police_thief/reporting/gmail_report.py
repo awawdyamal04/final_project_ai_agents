@@ -90,10 +90,15 @@ def send_report_email(
 
 def _build_message(report: MatchReport, report_path: Path, recipient: str) -> dict:
     import base64
-    import json
     from email.mime.text import MIMEText
 
-    body = json.dumps(report.to_email_dict(), indent=2)
+    from police_thief.config.canonical import canonical_json_text
+
+    # The emailed body must be the exact canonical bytes (interop-kit SPEC
+    # section 6): a pretty-printed re-serialization is a DIFFERENT byte
+    # string from what any hash was computed over, even when every value
+    # agrees -- the EX06 near-miss this guards against.
+    body = canonical_json_text(report.to_email_dict())
     message = MIMEText(body)
     message["to"] = recipient
     message["subject"] = f"Police-Thief league report: {Path(report_path).stem}"

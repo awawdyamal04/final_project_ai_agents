@@ -145,6 +145,53 @@ def _build_parser() -> argparse.ArgumentParser:
         default="results/learning",
         help="where learning profiles are read from and saved to",
     )
+    parser.add_argument(
+        "--interop",
+        choices=["reference-v3"],
+        default=None,
+        help=(
+            "additionally mount the copthief-league-protocol kit's "
+            "reference-v3 tool surface (negotiate/receive_turn/submit_audit/"
+            "receive_control) on this same peer, for cross-team sparring. "
+            "Purely additive -- coexists with the native protocol above and "
+            "never changes it."
+        ),
+    )
+    parser.add_argument(
+        "--interop-peer",
+        default=None,
+        help=(
+            "the external reference-v3 opponent's MCP URL, with --interop "
+            "reference-v3. Defaults to --opponent-url / the private "
+            "config's opponent_url -- this peer's own configured host/port "
+            "is always reused, never guessed."
+        ),
+    )
+    parser.add_argument(
+        "--interop-role",
+        choices=["police", "thief"],
+        default=None,
+        help="role to declare in the reference-v3 greeting (default: this peer's own role)",
+    )
+    parser.add_argument(
+        "--interop-events",
+        default=None,
+        help=(
+            "optional JSONL path to record reference-v3 diagnostics (send "
+            "times, round-trip durations, local/remote terminal decisions) "
+            "-- operational telemetry only, not the audit chain"
+        ),
+    )
+    parser.add_argument(
+        "--interop-sub-games",
+        type=int,
+        default=1,
+        help=(
+            "play the full sparring series (default: one sub-game). "
+            "Alternates role per sub-game exactly as the reference kit "
+            "does, without restarting this peer between games"
+        ),
+    )
     return parser
 
 
@@ -226,6 +273,22 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
     )
 
     print(f"  config_sha256  {orchestrator.config_hash}")
+
+    interop_state = None
+    if args.interop == "reference-v3":
+        from police_thief.interop import mount_reference_v3
+
+        interop_peer = args.interop_peer or private.network.opponent_url
+        interop_state = mount_reference_v3(
+            server.mcp,
+            config=shared,
+            group_id=private.game.group_id,
+            role_hint=args.interop_role or role.value,
+            opponent_url=interop_peer,
+            events_path=args.interop_events,
+            sub_games=args.interop_sub_games,
+        )
+        print(f"  interop        reference-v3 mounted (peer {interop_peer})")
 
     stop = asyncio.Event()
 
@@ -330,7 +393,13 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
                 # after Ctrl+C ends the hold.
                 _mark_gui_finished(orchestrator, gui_slot, exit_code)
 
-        if args.hold and exit_code == EXIT_OK:
+        # A reference-v3 sparring session has no native opponent at all, so
+        # the native handshake above is expected to fail every time it is
+        # run standalone -- that must not tear down the server the interop
+        # background task depends on. The native exit_code/failure reporting
+        # is untouched; this only widens when --hold keeps the process (and
+        # therefore the server) alive.
+        if args.hold and (exit_code == EXIT_OK or interop_state is not None):
             print("  holding; Ctrl+C to stop")
             await stop.wait()
     except KeyboardInterrupt:
@@ -352,11 +421,48 @@ async def run_peer(args: argparse.Namespace, gui_slot=None) -> int:
         await client.aclose()
         await server.stop()
         print(f"  shutdown       {orchestrator.machine.state.value}")
+        if interop_state is not None:
+            _print_interop_status(interop_state)
 
     if args.turns:
         _print_match_summary(orchestrator, args, exit_code, private, adaptive_model)
 
     return exit_code
+
+
+def _print_interop_status(interop_state) -> None:
+    """Best-effort status line for the reference-v3 background task -- never
+    blocks shutdown waiting for it (the sparring peer may still be mid-series
+    under --hold, in which case this simply reports "still running")."""
+    task = getattr(interop_state, "task", None)
+    if task is None or not task.done():
+        print("  interop        reference-v3 still running (no result yet)")
+        return
+    result = interop_state.result
+    if result.error:
+        print(f"  interop        reference-v3 ERROR: {result.error}")
+        return
+    if result.refusal:
+        print(f"  interop        reference-v3 REFUSED: {result.refusal}")
+        return
+    if result.series is not None:
+        for row in result.series.rows:
+            print(
+                f"  interop        sub-game {row.sub_game_number} ({row.role}): "
+                f"local={row.local_terminal} remote={row.remote_terminal} "
+                f"audit={row.audit_status} agree={row.agreement}"
+            )
+        print(f"  interop        series settled={result.series.settled}")
+        if result.series.refusal:
+            print(f"  interop        series REFUSED: {result.series.refusal}")
+        return
+    print(
+        f"  interop        reference-v3 outcome={result.outcome} "
+        f"records={result.records} audit_verified={result.audit_verified}"
+    )
+    if result.audit_mismatches:
+        for line in result.audit_mismatches:
+            print(f"    audit mismatch: {line}")
 
 
 def _print_match_summary(orchestrator, args, exit_code: int, private, adaptive_model=None) -> None:

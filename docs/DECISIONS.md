@@ -62,10 +62,12 @@ not bind it. Asserting FIXED status would be inventing a requirement. Resolves
 
 ## D-4 — Commit hash covers the rich record, canonically serialised
 
-**Decision.** `H_commit = SHA256(canonical_json(record))` where the record is
-`{game_id, sub_game, step, role, state, move, hint, intent, nonce}`,
-serialised with `sort_keys=True, separators=(",", ":")`, UTF-8. The schema is
-agreed with the opponent before the match and its hash exchanged at handshake.
+**Decision (corrected 2026-08-20 — see below).** `H_commit =
+SHA256(canonical_json(record_without_nonce) + "|" + nonce)` where the record
+is `{v, game_id, sub_game, turn, role, state, action, hint, intent}` plus the
+pipe-appended `nonce`, canonically serialised with `sort_keys=True,
+separators=(",", ":")`, UTF-8. The schema is agreed with the opponent before
+the match and its hash exchanged at handshake.
 
 **Why.** Ch. 5 gives a four-field formula but states in the same passage that
 the record actually sealed is richer (hint, intent classification, step, role)
@@ -77,6 +79,29 @@ committing to it. Resolves [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) Q-4.
 **Cost.** The schema must be negotiated, since a mismatch makes every audit fail.
 Accepted — this is inherent to a judge-free design and is why the config-hash
 exchange exists.
+
+**Correction (2026-08-20), nonce placement.** The book's v3.0.0 release
+publishes three mutually inconsistent commit constructions (a ch.5 listing
+that seals the nonce *inside* the hashed JSON object as an ordinary field; a
+ch.7/audit-chapter snippet, `SHA256(f"{nonce}|{move}")`, self-declared
+illustrative; and the reference implementation's own
+`SHA256(canonical(payload)|nonce)`, nonce pipe-appended *outside* the
+hashed object). The original D-4 text above implemented the first
+(ch.5-listing) form — self-consistent, every local test passed, and the
+divergence from the reference form was invisible until checked against an
+external conformance kit (`copthief-league-protocol`, a cross-team
+interop-vectors project, not the book) whose `vectors/commit_reveal.json`
+pins the reference form byte-for-byte. Since this project's own audit
+re-hashes only its own revealed records (self-verification never crosses
+this line), the bug never surfaced in this repository's test suite; it
+would surface only against a real opponent's audit. Switched to the
+reference form (`crypto/sealed.py`'s `commitment()`/`commitment_for_mapping()`,
+via the new `config/hashing.py::pipe_nonce_commitment`) as the safer of the
+two resolutions the interop kit itself offers (switch, or sign a documented
+deviation into `config/game.json`) — it costs nothing (the wire schema,
+message flow and key set are unchanged; only the internal hash formula
+moved) and is what any opponent's audit will assume by default. See
+`tests/interop/test_commit_reveal.py` for the regression coverage.
 
 ---
 

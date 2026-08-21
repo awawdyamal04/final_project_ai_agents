@@ -224,9 +224,14 @@ def test_commitment_is_deterministic():
 
 
 def test_known_digest_fixture():
-    """Pinned so an accidental schema change fails loudly."""
+    """Pinned so an accidental schema change fails loudly.
+
+    Updated for the interop-kit commit fix (docs/OPEN_QUESTIONS.md): the
+    nonce is now pipe-appended to the canonical bytes rather than sealed
+    as a key inside the hashed object -- the reference cross-team form.
+    """
     assert record().commitment() == (
-        "f7a7972f974e0b90c2f1e68cb6c51bd12585c236df2af20354fef0becd464e0a"
+        "305767d61f139e4a0cf59464c9b46e73584a777ec729214f893fef179251d7ff"
     )
 
 

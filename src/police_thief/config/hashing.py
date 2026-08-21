@@ -36,6 +36,22 @@ def sha256_hex(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def pipe_nonce_commitment(payload: Mapping[str, Any], nonce: str) -> str:
+    """``SHA256(canonical_json_bytes(payload) + b"|" + nonce)``.
+
+    The cross-team-conformant commit/signature construction: the nonce is
+    pipe-appended to the canonical bytes, never sealed as a key inside the
+    hashed object. This is what an opponent's audit re-hashes your revealed
+    records against (and what a terms/agreement signature uses, over the
+    negotiated terms instead of a turn payload) -- see
+    ``crypto/sealed.py``'s ``commitment()``/``commitment_for_mapping()`` and
+    ``protocol/interop_ids.py``, and docs/OPEN_QUESTIONS.md for the book's
+    own three mutually-inconsistent published forms and why this one was
+    chosen.
+    """
+    return sha256_hex(canonical_json_bytes(dict(payload)) + f"|{nonce}".encode())
+
+
 def config_sha256(shared_mapping: Mapping[str, Any]) -> str:
     """Return ``config_sha256`` for a shared configuration mapping.
 

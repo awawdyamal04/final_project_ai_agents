@@ -12,10 +12,15 @@ is a *different* construction -- a nonce-signed hash over a flat, extracted
 foreign implementation, and is not itself a book requirement.
 
 Which of this project's own config keys correspond 1:1 to the kit's flat
-14-key set (``board_size``, ``smell_grid_size``, ``decay_per_step``, ...) is
-left unresolved here deliberately -- see docs/OPEN_QUESTIONS.md -- rather
-than guessed, per CLAUDE.md's rule against fabricating an unresolved mapping.
-Callers that need it supply their own ``terms`` mapping.
+14-key set (``board_size``, ``smell_grid_size``, ``decay_per_step``, ...) was
+left unresolved here deliberately at first -- rather than guessed, per
+CLAUDE.md's rule against fabricating an unresolved mapping. It is now
+resolved: see ``interop/wire.py``'s ``terms_from_config``, built by reading
+the kit's own ``sparring/config.py`` (``TERMS_KEYS``/``SparConfig.terms()``)
+directly rather than inferring it, and docs/OPEN_QUESTIONS.md Q-21 point 3.
+The functions below still take their ``terms`` mapping as a plain argument
+rather than deriving it themselves, so this module stays agnostic to where
+that mapping came from.
 """
 
 from __future__ import annotations

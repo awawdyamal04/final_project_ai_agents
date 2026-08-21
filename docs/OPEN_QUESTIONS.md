@@ -706,3 +706,30 @@ in the book requires it standing alone.
 See `tests/interop/` for the full audit (byte-exact checks against the
 kit's `vectors/`, and documentation-style tests pinning the above as known,
 deliberate current-state facts).
+
+**Update (2026-08-20, adapter phase).** Item 1 is now additionally
+addressed, not by rewriting the native protocol (still unchanged and still
+the only wire this project's own two-repo submission uses) but by a new,
+purely additive package, `src/police_thief/interop/`, which mounts the
+kit's four `reference-v3` tools (`negotiate`/`receive_turn`/`submit_audit`/
+`receive_control`) onto the same FastMCP server via
+`mount_reference_v3(server.mcp, ...)`, gated behind `peer/run.py --interop
+reference-v3` (opt-in; the default CLI surface is unchanged). Item 3's
+mapping question is resolved — see `interop/wire.py`'s
+`terms_from_config`, built by reading the kit's own `sparring/config.py`
+directly. Item 4 is still accurate: this project's adapter declares no
+locked-model hash by default (`negotiation.build_greeting`'s `locks`
+parameter exists and is exercised in `tests/interop/test_v3_negotiation.py`,
+but nothing calls it with a real value yet). Verified against the real,
+cloned kit over live MCP calls (not just its `vectors/`): a genuine
+`negotiate` handshake, an 11-step real commit-reveal turn exchange, and the
+kit's own audit re-hash of this project's revealed records all completed
+successfully cross-runtime (this project's `fastmcp==3.4.5` against the
+kit's own pinned `fastmcp<3.0`). One real, still-open finding from that run:
+this project's side and the kit's side disagreed on the sub-game's final
+outcome (`capture` here vs. `timeout` there) despite the audit itself
+passing — most likely the adapter's per-call cost (a fresh FastMCP session
+per outbound message, several HTTP round-trips each) outrunning the
+opponent's own per-turn budget under real network conditions, not a wire
+incompatibility. Not yet root-caused with certainty; flagged as a blocker
+before a real timed cross-team friendly, not before further sparring.
